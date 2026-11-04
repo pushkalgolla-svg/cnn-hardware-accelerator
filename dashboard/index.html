@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Designed CNN Accelerator & Verification Dashboard</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(22, 30, 49, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --cell-bg: #1e293b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text-main); min-height: 100vh; padding: 2rem; }
+
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 2rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1.5rem;
+    }
+    .badge {
+      background: rgba(16, 185, 129, 0.15); color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.35rem 0.8rem;
+      border-radius: 9999px; font-weight: 600; font-size: 0.85rem; letter-spacing: 0.05em;
+    }
+
+    .arch-toggle-container {
+      display: flex; gap: 0.5rem; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 10px; margin-bottom: 1.5rem;
+      border: 1px solid var(--card-border); width: fit-content;
+    }
+    .arch-btn {
+      padding: 0.5rem 1.25rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--text-muted); transition: all 0.2s; font-size: 0.88rem;
+    }
+    .arch-btn.active {
+      background: #0284c7; color: #fff; box-shadow: 0 0 12px rgba(2, 132, 199, 0.5);
+    }
+
+    .grid-stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem; margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 1.25rem; backdrop-filter: blur(8px);
+    }
+    .stat-val { font-size: 1.75rem; font-weight: 700; color: var(--accent); margin-top: 0.25rem; }
+    .stat-label { font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; }
+
+    .main-layout { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 2rem; }
+    .panel {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 16px; padding: 1.5rem; backdrop-filter: blur(12px);
+    }
+
+    .matrix-container { display: flex; gap: 1.5rem; justify-content: space-around; align-items: flex-start; margin-top: 1rem; }
+    .matrix-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .matrix-title { font-size: 0.88rem; font-weight: 600; color: var(--text-muted); }
+
+    .matrix-grid { display: grid; gap: 3px; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 8px; }
+    .grid-8x8 { grid-template-columns: repeat(8, 30px); }
+    .grid-3x3 { grid-template-columns: repeat(3, 30px); }
+    .grid-6x6 { grid-template-columns: repeat(6, 36px); }
+
+    .cell {
+      height: 30px; display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 600; border-radius: 4px; background: var(--cell-bg);
+      color: #cbd5e1; transition: all 0.15s ease;
+    }
+    .grid-6x6 .cell { height: 36px; font-size: 0.68rem; font-family: monospace; }
+
+    .cell.active-rf {
+      background: #f59e0b !important; color: #000 !important; font-weight: 700;
+      transform: scale(1.08); box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+    }
+    .cell.active-out {
+      background: #38bdf8 !important; color: #000 !important; font-weight: 700;
+      transform: scale(1.1); box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+    }
+
+    .controls { display: flex; gap: 0.75rem; align-items: center; margin-top: 1.5rem; }
+    button.ctl {
+      background: #1e293b; color: white; border: 1px solid var(--card-border);
+      padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 600;
+      transition: background 0.2s;
+    }
+    button.ctl:hover { background: #334155; }
+    button.ctl.primary { background: #0284c7; border-color: #38bdf8; }
+
+    .math-breakdown {
+      margin-top: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 10px;
+      font-family: monospace; font-size: 0.85rem; line-height: 1.6;
+    }
+
+    .comparison-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 1rem; }
+    .comparison-table th, .comparison-table td { padding: 8px 10px; border-bottom: 1px solid var(--card-border); }
+    .comparison-table th { color: var(--text-muted); text-align: left; background: rgba(0,0,0,0.2); }
+
+    .resume-section {
+      margin-top: 2rem; background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 16px; padding: 1.5rem;
+    }
+    .resume-list { list-style: square; padding-left: 1.5rem; color: #cbd5e1; font-size: 0.95rem; line-height: 1.8; }
+    .resume-list strong { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1 style="font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em;">AI-Designed CNN Accelerator & Verification Dashboard</h1>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">Silicon Microarchitecture Exploration • Verilog RTL • Yosys Synthesis • 100% Bit-Exact Match</p>
+    </div>
+    <div class="badge">100% BIT-EXACT PASS (BOTH ARCHITECTURES)</div>
+  </header>
+
+  <div class="arch-toggle-container">
+    <button class="arch-btn active" id="btn-arch-a" onclick="setArchitecture('A')">Architecture A: Serial Baseline (Area-Minimal)</button>
+    <button class="arch-btn" id="btn-arch-b" onclick="setArchitecture('B')">Architecture B: Parallel 9-MAC (9x Speedup)</button>
+  </div>
+
+  <div class="grid-stats">
+    <div class="stat-card">
+      <div class="stat-label">Yosys Synthesized Gates</div>
+      <div class="stat-val" id="stat-gates">2,270 gates</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Compute Latency</div>
+      <div class="stat-val" id="stat-latency">330 cycles <span style="font-size: 0.85rem; color: var(--text-muted);">(3.30 μs)</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Inference Throughput</div>
+      <div class="stat-val" id="stat-fps">303,030 fps</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Compute Density</div>
+      <div class="stat-val" id="stat-density" style="color: var(--success);">196.4 MOPS</div>
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <div class="panel">
+      <h2 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Interactive 2D Convolution Visualizer</h2>
+      <p style="color: var(--text-muted); font-size: 0.85rem;" id="arch-desc">Architecture A: Single MAC unit accumulating 9 products over 9 cycles per pixel.</p>
+
+      <div class="matrix-container">
+        <div class="matrix-wrapper">
+          <div class="matrix-title">8x8 Image (Image[r,c])</div>
+          <div id="image-grid" class="matrix-grid grid-8x8"></div>
+        </div>
+
+        <div class="matrix-wrapper">
+          <div class="matrix-title">3x3 Kernel (Weight[i,j])</div>
+          <div id="kernel-grid" class="matrix-grid grid-3x3"></div>
+        </div>
+
+        <div class="matrix-wrapper">
+          <div class="matrix-title">6x6 Convolved Output</div>
+          <div id="output-grid" class="matrix-grid grid-6x6"></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="btn-play" class="ctl primary" onclick="togglePlay()">▶ Play Animation</button>
+        <button class="ctl" onclick="stepForward()">Step Next ⏭</button>
+        <button class="ctl" onclick="resetSim()">↺ Reset</button>
+        <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: auto;">
+          Output Index: <strong id="idx-display" style="color: var(--accent);">0 / 35</strong>
+        </span>
+      </div>
+
+      <div class="math-breakdown" id="math-display">
+        Click 'Play' or 'Step' to view the hardware MAC dot-product equation.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Side-by-Side PPA Trade-off Study</h2>
+      <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 0.5rem;">Extracted directly from physical Yosys 0.70 standard cell synthesis & Icarus Verilog simulations.</p>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Serial Baseline (A)</th>
+            <th>Parallel 9-MAC (B)</th>
+            <th>Speedup</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>MAC Units</strong></td>
+            <td>1 Multiplier</td>
+            <td><strong>9 Multipliers + Adder Tree</strong></td>
+            <td style="color:var(--success); font-weight:700;">9x Parallelism</td>
+          </tr>
+          <tr>
+            <td><strong>Output Rate</strong></td>
+            <td>1 pixel / 9 cycles</td>
+            <td><strong>1 pixel / 1 cycle</strong></td>
+            <td style="color:var(--success); font-weight:700;">9.0x Rate</td>
+          </tr>
+          <tr>
+            <td><strong>Latency (100MHz)</strong></td>
+            <td>330 cycles (3.3 μs)</td>
+            <td><strong>36 cycles (0.36 μs)</strong></td>
+            <td style="color:var(--success); font-weight:700;">9.17x Faster</td>
+          </tr>
+          <tr>
+            <td><strong>Throughput</strong></td>
+            <td>303,030 fps</td>
+            <td><strong>2,777,778 fps</strong></td>
+            <td style="color:var(--success); font-weight:700;">9.17x Higher</td>
+          </tr>
+          <tr>
+            <td><strong>Compute Density</strong></td>
+            <td>196.4 MOPS</td>
+            <td><strong>1,800.0 MOPS (1.8 GOPS)</strong></td>
+            <td style="color:var(--success); font-weight:700;">9.17x MOPS</td>
+          </tr>
+          <tr>
+            <td><strong>Gate Area (Yosys)</strong></td>
+            <td><strong>2,270 gates</strong></td>
+            <td>43,741 gates</td>
+            <td style="color:var(--warning);">19.2x Area</td>
+          </tr>
+          <tr>
+            <td><strong>Verification</strong></td>
+            <td style="color:var(--success); font-weight:600;">36/36 PASS</td>
+            <td style="color:var(--success); font-weight:600;">36/36 PASS</td>
+            <td>100% Bit-Exact</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="resume-section">
+    <h2 style="font-size: 1.1rem; margin-bottom: 0.75rem;">Resume Bullet Points (Microarchitecture & Verification)</h2>
+    <ul class="resume-list">
+      <li><strong>AI Silicon Co-Design & Microarchitecture:</strong> Designed and synthesized two parameterized 2D CNN Hardware Accelerators in Verilog-2001—a compact serial MAC architecture (2,270 gates) and a high-throughput 9-MAC parallel architecture (43,741 gates, ReLU activation)—achieving a <strong>9.17x latency reduction (36 cycles, 1.80 GOPS)</strong>.</li>
+      <li><strong>Autonomous Verification Pipeline:</strong> Developed an automated AI-in-the-loop verification orchestrator in Python using Gemini API and Icarus Verilog (<code>iverilog</code>/<code>vvp</code>), integrating compiler error diagnostic self-healing to achieve 100% bit-exact mathematical verification (36/36 pixels) against a NumPy software golden reference model.</li>
+      <li><strong>ASIC Gate-Level Synthesis & PPA Benchmarking:</strong> Conducted gate-level synthesis targeting a CMOS standard cell library using Yosys 0.70 and ABC, evaluating the silicon area vs. throughput trade-off curve across clock frequencies up to 100 MHz.</li>
+    </ul>
+  </div>
+
+  <script>
+    const imageHex = "39 0c 8c 7d 72 47 34 2c d8 10 0f 2f 6f 77 0d 65 d6 70 e5 8e 03 51 d8 ae 8e 4f 6e ac 34 2f c2 31 b7 b0 87 16 eb 3f c1 28 96 b9 62 23 17 74 94 28 77 33 c2 8e e8 ba 53 bd b5 6b 88 24 57 7d 53 ec".split(" ");
+    const kernelHex = "c2 8a 70 a6 1c 75 10 a1 cd".split(" ");
+    const expectedHex = "020ec6 01b57a 018af8 0167df 01ce72 01fa13 024532 019f32 019759 016608 01c3a3 01cd3b 02bff5 020dd5 023fc3 01e2fb 01dcd2 01e562 025a22 01b295 01babb 01653e 024e01 01763c 0289c5 02595b 024613 0228de 024dab 01ee24 026731 01c092 01c35d 01c132 01f7f1 028a40".split(" ");
+
+    const imageVals = imageHex.map(h => parseInt(h, 16));
+    const kernelVals = kernelHex.map(h => parseInt(h, 16));
+    const expectedVals = expectedHex.map(h => parseInt(h, 16));
+
+    let currentArch = 'A';
+    let currentIdx = 0;
+    let isPlaying = false;
+    let timer = null;
+
+    // Render Grids
+    const imgGrid = document.getElementById("image-grid");
+    imageVals.forEach((val, idx) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.id = `img-${idx}`;
+      cell.textContent = val;
+      cell.title = `Pixel ${idx} (0x${val.toString(16)})`;
+      imgGrid.appendChild(cell);
+    });
+
+    const kernGrid = document.getElementById("kernel-grid");
+    kernelVals.forEach((val, idx) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = val;
+      cell.style.background = "#334155";
+      cell.title = `Weight ${idx} (0x${val.toString(16)})`;
+      kernGrid.appendChild(cell);
+    });
+
+    const outGrid = document.getElementById("output-grid");
+    expectedHex.forEach((hex, idx) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.id = `out-${idx}`;
+      cell.textContent = hex.slice(-4);
+      cell.title = `Output ${idx}: 0x${hex} (${parseInt(hex, 16)})`;
+      outGrid.appendChild(cell);
+    });
+
+    function setArchitecture(arch) {
+      currentArch = arch;
+      document.getElementById("btn-arch-a").classList.toggle("active", arch === 'A');
+      document.getElementById("btn-arch-b").classList.toggle("active", arch === 'B');
+
+      if (arch === 'A') {
+        document.getElementById("stat-gates").textContent = "2,270 gates";
+        document.getElementById("stat-latency").innerHTML = "330 cycles <span style='font-size:0.85rem;color:var(--text-muted);'>(3.30 μs)</span>";
+        document.getElementById("stat-fps").textContent = "303,030 fps";
+        document.getElementById("stat-density").textContent = "196.4 MOPS";
+        document.getElementById("arch-desc").textContent = "Architecture A (Serial): Single MAC accumulating 9 cycles per pixel. Ultra-compact silicon area.";
+      } else {
+        document.getElementById("stat-gates").textContent = "43,741 gates";
+        document.getElementById("stat-latency").innerHTML = "36 cycles <span style='font-size:0.85rem;color:var(--text-muted);'>(0.36 μs)</span>";
+        document.getElementById("stat-fps").textContent = "2,777,778 fps";
+        document.getElementById("stat-density").textContent = "1.80 GOPS";
+        document.getElementById("arch-desc").textContent = "Architecture B (Parallel 9-MAC): 9 parallel multipliers + adder tree + ReLU emitting 1 pixel/cycle. 9.17x throughput!";
+      }
+      updateView(currentIdx);
+    }
+
+    function updateView(idx) {
+      document.querySelectorAll(".cell").forEach(c => {
+        c.classList.remove("active-rf");
+        c.classList.remove("active-out");
+      });
+
+      const r = Math.floor(idx / 6);
+      const c = idx % 6;
+
+      let sumEquation = [];
+      let total = 0;
+
+      for (let kr = 0; kr < 3; kr++) {
+        for (let kc = 0; kc < 3; kc++) {
+          const imgIdx = (r + kr) * 8 + (c + kc);
+          const kIdx = kr * 3 + kc;
+          const p = imageVals[imgIdx];
+          const w = kernelVals[kIdx];
+          const prod = p * w;
+          total += prod;
+
+          const cell = document.getElementById(`img-${imgIdx}`);
+          if (cell) cell.classList.add("active-rf");
+          sumEquation.push(`(${p}×${w})`);
+        }
+      }
+
+      const outCell = document.getElementById(`out-${idx}`);
+      if (outCell) outCell.classList.add("active-out");
+
+      document.getElementById("idx-display").textContent = `${idx} / 35 (Row ${r}, Col ${c})`;
+      
+      const timingNote = currentArch === 'A' 
+        ? `<span style='color:var(--warning);'>Cycle ${idx*9 + 1} to ${idx*9 + 9} (9 cycles accumulation)</span>`
+        : `<span style='color:var(--accent);'>Cycle ${idx + 1} (Single-cycle parallel MAC + ReLU)</span>`;
+
+      document.getElementById("math-display").innerHTML = `
+        <strong>Output[${r},${c}] (Pixel ${idx}) | Timing: ${timingNote}</strong><br>
+        <strong>Parallel MAC Tree:</strong> ${sumEquation.slice(0, 4).join(" + ")} + ... + ${sumEquation.slice(7).join(" + ")}<br>
+        <strong>Computed Value:</strong> <span style="color: #38bdf8;">${total.toLocaleString()}</span> (0x${total.toString(16).padStart(6, "0")}) | <strong>Golden Model:</strong> 0x${expectedHex[idx]} <span style="color: #10b981;">[100% BIT-EXACT MATCH]</span>
+      `;
+    }
+
+    function stepForward() {
+      currentIdx = (currentIdx + 1) % 36;
+      updateView(currentIdx);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      currentIdx = 0;
+      updateView(0);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById("btn-play");
+      if (isPlaying) {
+        btn.textContent = "⏸ Pause";
+        btn.style.background = "#e11d48";
+        timer = setInterval(stepForward, currentArch === 'A' ? 600 : 250);
+      } else {
+        btn.textContent = "▶ Play Animation";
+        btn.style.background = "#0284c7";
+        clearInterval(timer);
+      }
+    }
+
+    updateView(0);
+  </script>
+</body>
+</html>

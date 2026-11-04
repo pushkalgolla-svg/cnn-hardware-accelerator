@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.env
+.venv/
+env/
+
+# Simulation binaries
+sim/cnn_sim
+sim/cnn_sim_parallel
+*.out
+*.exe
+
+# Waveforms (optional: keep if small or ignore)
+*.log

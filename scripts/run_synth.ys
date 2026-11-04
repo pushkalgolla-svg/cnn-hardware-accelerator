@@ -1,0 +1,9 @@
+
+read_verilog "C:/Users/91900/.gemini/antigravity/scratch/cnn_accelerator/src/cnn_accel.v"
+hierarchy -check -top cnn_accel
+proc; opt; memory; opt; fsm; opt
+synth -top cnn_accel
+abc -g cmos2
+opt_clean
+write_verilog -noattr "C:/Users/91900/.gemini/antigravity/scratch/cnn_accelerator/src/cnn_accel_synth.v"
+stat
