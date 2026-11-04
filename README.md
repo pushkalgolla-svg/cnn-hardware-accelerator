@@ -1,10 +1,13 @@
 # Autonomous AI-Designed CNN Hardware Accelerator & Architecture Trade-off Study
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-cnn--hardware--accelerator.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://cnn-hardware-accelerator.vercel.app)
 [![Verilog-2001](https://img.shields.io/badge/Verilog-2001-blue.svg)](https://en.wikipedia.org/wiki/Verilog)
 [![Simulation](https://img.shields.io/badge/Simulator-Icarus_Verilog_12.0-green.svg)](https://steveicarus.github.io/iverilog/)
 [![Synthesis](https://img.shields.io/badge/Synthesis-Yosys_0.70-orange.svg)](https://yosyshq.net/yosys/)
 [![Verification](https://img.shields.io/badge/Verification-100%25_Bit--Exact_Pass-brightgreen.svg)]()
 [![AI-Orchestrator](https://img.shields.io/badge/AI_EDA-Google_Gemini_Flash-purple.svg)](https://ai.google.dev/)
+
+> 🚀 **Live Interactive Visualizer**: [https://cnn-hardware-accelerator.vercel.app](https://cnn-hardware-accelerator.vercel.app)
 
 An autonomous, closed-loop AI Electronic Design Automation (EDA) framework where Google Gemini acts as both the **Digital Hardware Architect** and **Verification Engineer** to design, simulate, self-heal, synthesize, and benchmark two contrasting integer 2D Convolution CNN Accelerators in Verilog.
 
