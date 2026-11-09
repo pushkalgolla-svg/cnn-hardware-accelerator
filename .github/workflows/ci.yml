@@ -1,4 +1,4 @@
-name: Hardware Verification CI
+name: Hardware Verification & Synthesis CI
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  verify:
-    name: RTL Lint & Multi-Vector Simulation
+  verify-and-synthesize:
+    name: RTL Verification & Yosys Synthesis Benchmark
     runs-on: ubuntu-latest
 
     steps:
@@ -20,15 +20,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Icarus Verilog
+      - name: Install EDA Tools (Icarus Verilog & Yosys)
         run: |
           sudo apt-get update
-          sudo apt-get install -y iverilog
+          sudo apt-get install -y iverilog yosys
 
-      - name: Verify Toolchain
+      - name: Verify Toolchain Installation
         run: |
           python3 --version
           iverilog -V
+          yosys -V
 
       - name: Generate Independent Golden Vectors
         run: |
@@ -37,6 +38,14 @@ jobs:
       - name: Run Multi-Vector RTL Regression Suite (iverilog + vvp)
         run: |
           python3 scripts/run_verification.py
+
+      - name: Execute ASIC Gate-Level Synthesis Benchmark (Yosys + ABC)
+        run: |
+          python3 scripts/synth_benchmark.py
+
+      - name: Validate Synthesis Benchmark Report & PPA Metrics
+        run: |
+          python3 scripts/validate_benchmark.py
 
       - name: Run Architectural Comparison & Sanity Checks
         run: |

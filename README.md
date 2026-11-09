@@ -20,8 +20,8 @@ This repository contains synthesizable Verilog-2001 RTL designs, race-free verif
 1. **Architecture A (Serial Baseline)**:
    - **Datapath**: 1 dedicated $8 \times 8$-bit unsigned hardware multiplier and a 24-bit accumulator register.
    - **Address Generation**: Dynamic 2D address generator calculating memory addresses combinationally (`{row[2:0], col[2:0]}`), streaming data cycle-by-cycle without internal SRAM buffers.
-   - **Area Footprint**: Ultra-compact silicon footprint of **2,474 standard CMOS gates**.
-   - **Latency**: 324 active compute cycles (9 cycles/pixel $\times$ 36 pixels) + 1 cycle done pulse = 325 total execution cycles.
+   - **Gate Footprint**: Ultra-compact logic footprint of **2,474 generic CMOS logic gates** (abstract standard cell count, not physical silicon area).
+   - **Latency**: 324 active MAC compute cycles + 1 cycle start transition + 1 cycle done pulse = 326 total execution cycles (live measured via Icarus Verilog).
 
 2. **Architecture B (Parallel 9-MAC + Combinational Tree)**:
    - **Datapath**: 9 parallel spatial multipliers ($8\text{-bit} \times 8\text{-bit} \to 16\text{-bit}$) feeding a **single-cycle combinational adder tree** (non-pipelined, 3 stages of combinational adders) and ReLU activation.
@@ -30,8 +30,8 @@ This repository contains synthesizable Verilog-2001 RTL designs, race-free verif
    - **Hardware Safety Guards**:
      - *Buffer Write-Protection*: Buffer writes are strictly prohibited during the `COMPUTE` state (`state == IDLE` guard).
      - *Address Validation*: Address decoding prevents out-of-bounds array access (guarding `kernel_wr_addr < 4'd9`).
-   - **Throughput & Speedup**: Computes 1 output pixel per clock cycle. Emits all 36 pixels in **36 active compute cycles** (**$9.00\times$ active compute speedup**).
-   - **Area Footprint**: **28,522 standard CMOS gates** ($11.53\times$ area investment for $9.0\times$ arithmetic throughput).
+   - **Throughput & Speedup**: Computes 1 output pixel per clock cycle. Emits all 36 pixels in **36 active compute cycles** (**$9.00\times$ arithmetic compute speedup**).
+   - **Gate Footprint**: **28,522 generic CMOS logic gates** ($11.53\times$ logic gate count scaling for $9.0\times$ arithmetic throughput).
 
 ---
 
@@ -44,21 +44,22 @@ All synthesis metrics are extracted reproducibly under identical Yosys + ABC set
 | **Arithmetic Units** | 1 Serial Multiplier + Acc | **9 Parallel Multipliers + Adder Tree** | $9.0\times$ Datapath Parallelism |
 | **Adder Tree Microarchitecture** | Sequential Accumulator | **Single-Cycle Combinational Tree** | Non-pipelined (3 stages logic) |
 | **Buffer Preload Cycles** | **0 cycles** (Streaming memory reads) | **73 cycles** (64 image + 9 kernel) | Preload required for parallel array |
-| **Active Compute Cycles** | **324 cycles** (9 cycles / pixel) | **36 cycles** (1 cycle / pixel) | **$9.00\times$ Compute Speedup** |
-| **Total Execution Cycles** | **325 cycles** | **110 cycles** (73 load + 36 compute + 1) | **$2.95\times$ Total Speedup** |
+| **Pure Arithmetic Cycles**| **324 cycles** (9 cycles / pixel) | **36 cycles** (1 cycle / pixel) | **$9.00\times$ Arithmetic Speedup** |
+| **Total Measured Cycles**| **326 cycles** (Icarus simulation) | **111 cycles** (73 load + 38 compute) | **$2.94\times$ Total Speedup** |
 | **Compute Latency (@ 100 MHz\*)** | $3.24\,\mu\text{s}$ | **$0.36\,\mu\text{s}$** | $9.00\times$ Latency Reduction |
-| **Total Latency (@ 100 MHz\*)** | $3.25\,\mu\text{s}$ | **$1.10\,\mu\text{s}$** | $2.95\times$ Latency Reduction |
+| **Total Latency (@ 100 MHz\*)** | $3.26\,\mu\text{s}$ | **$1.11\,\mu\text{s}$** | $2.94\times$ Latency Reduction |
 | **Inference Throughput (Compute)** | $308,642$ frames/sec | **$2,777,778$ frames/sec** | $9.00\times$ Higher Throughput |
-| **Inference Throughput (Total)** | $307,692$ frames/sec | **$909,091$ frames/sec** | $2.95\times$ Higher Throughput |
+| **Inference Throughput (Total)** | $306,748$ frames/sec | **$900,901$ frames/sec** | $2.94\times$ Higher Throughput |
 | **Peak Arithmetic Density** | $200.0$ MOPS | **$1,800.0$ MOPS ($1.80$ GOPS)** | $9.00\times$ Compute Density |
-| **Standard Cell Gates (Yosys)** | **2,474 gates** | **28,522 gates** | $11.53\times$ Silicon Area Investment |
-| **Logical Nets (RTLIL Wires)\*\***| $3,882$ wires | $43,694$ wires | $11.26\times$ Logical Net Count |
-| **Logical Wire Bits\*\*** | $4,115$ wire bits | $46,085$ wire bits | $11.20\times$ Net Bit Complexity |
+| **Standard Cell Gates (Yosys)\*\*** | **2,474 gates** | **28,522 gates** | $11.53\times$ Logic Gate Scaling |
+| **Logical Nets (RTLIL Wires)\*\*\***| $3,882$ wires | $43,694$ wires | $11.26\times$ Logical Net Count |
+| **Logical Wire Bits\*\*\*** | $4,115$ wire bits | $46,085$ wire bits | $11.20\times$ Net Bit Complexity |
 | **Gate Breakdown** | $569$ AND, $1,355$ NOT, $550$ OR | $7,795$ AND, $584$ LOGIC\_NOT, $14,926$ NOT, $5,217$ OR | Optimized via ABC technology mapping |
 | **Multi-Vector Regression** | **100% Bit-Exact PASS (5 suites)** | **100% Bit-Exact PASS (5 suites)** | Verified against Python reference |
 
 *\*Note on STA: 100 MHz is an assumed nominal reference clock for architectural cycle-time conversion ($10\,\text{ns}$ period), not a signed-off physical Static Timing Analysis (STA) timing closure, which requires foundry-specific standard cell PDKs, sign-off STA tools (e.g., OpenSTA), and parasitic extraction.*  
-*\*\*Note on Wires: Yosys wire counts quantify RTLIL netlist connectivity nets and bits, not physical metal routing tracks or wirelength measurements, which require physical Place & Route (P&R).*
+*\*\*Note on Gates: Standard cell counts represent generic Boolean logic gates (`cmos2`: NOT, AND, OR) mapped via Yosys + ABC. These quantify relative logical gate complexity, NOT physical silicon layout area ($\mu\text{m}^2/\text{mm}^2$), which requires physical P&R with foundry-specific standard cell geometries.*  
+*\*\*\*Note on Wires: Yosys wire counts quantify RTLIL netlist connectivity nets and bits, not physical metal routing tracks or wirelength measurements, which require physical Place & Route (P&R).*
 
 ---
 
@@ -69,13 +70,15 @@ Cycle accounting is rigorously measured in cycle-accurate Icarus Verilog simulat
 | Architecture | Phase | Analytical Formulation | Analytical Cycles | Measured Sim Cycles | Match |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Architecture A (Serial)** | Preload | Streaming reads during compute | 0 | **0** | Exact |
+| | FSM Start | Transition `IDLE` $\to$ `COMPUTE` | 1 | **1** | Exact |
 | | Compute | $36 \text{ pixels} \times 9 \text{ MACs/pixel}$ | 324 | **324** | Exact |
 | | Completion | State transition to `DONE` pulse | 1 | **1** | Exact |
-| | **Total** | $0 + 324 + 1$ | **325** | **325** | Exact |
+| | **Total** | $0 + 1 + 324 + 1$ | **326** | **326** | Exact |
 | **Architecture B (Parallel)** | Preload | $9 \text{ (kernel)} + 64 \text{ (image)}$ | 73 | **73** | Exact |
+| | FSM Start | Transition `IDLE` $\to$ `COMPUTE` | 1 | **1** | Exact |
 | | Compute | $36 \text{ pixels} \times 1 \text{ cycle/pixel}$ | 36 | **36** | Exact |
-| | Completion | State transition to `IDLE` + done pulse | 1 | **1** | Exact |
-| | **Total** | $73 + 36 + 1$ | **110** | **110** | Exact |
+| | Completion | State transition to `DONE_ST` pulse | 1 | **1** | Exact |
+| | **Total** | $73 + 1 + 36 + 1$ | **111** | **111** | Exact |
 
 ---
 

@@ -42,8 +42,9 @@ module tb_cnn_parallel;
     wire        done;
 
     // Memory Models (loaded from .hex test vectors)
-    reg [7:0] tb_image_mem  [0:63];
-    reg [7:0] tb_kernel_mem [0:8];
+    reg [7:0]  tb_image_mem    [0:63];
+    reg [7:0]  tb_kernel_mem   [0:8];
+    reg [23:0] tb_expected_mem [0:35];
 
     // Tracking and Cycle Measurement Variables
     integer outfile;
@@ -51,6 +52,8 @@ module tb_cnn_parallel;
     integer output_count;
     integer frame_count;
     integer total_errors;
+    integer phase_val_errors;
+    integer current_phase;
     integer cycle_counter;
     integer preload_start_cycle;
     integer preload_cycles;
@@ -141,9 +144,10 @@ module tb_cnn_parallel;
         kernel_wr_addr = 0;
         kernel_wr_data = 0;
 
-        // Load primary test stimulus
+        // Load primary test stimulus and reference outputs
         $readmemh("../data/image.hex", tb_image_mem);
         $readmemh("../data/kernel.hex", tb_kernel_mem);
+        $readmemh("../data/expected_output.hex", tb_expected_mem);
         outfile = $fopen("../data/hw_output_parallel.hex", "w");
         if (outfile == 0) begin
             $display("ERROR: Could not open ../data/hw_output_parallel.hex for writing.");
@@ -154,6 +158,10 @@ module tb_cnn_parallel;
         // Phase 1: Power-on Synchronous Reset & Preload
         // -------------------------------------------------------------
         $display("\n[Phase 1] Applying synchronous power-on reset...");
+        current_phase = 1;
+        phase_val_errors = 0;
+        output_count = 0;
+
         @(negedge clk);
         rst   = 1'b1;
         start = 1'b0;
@@ -176,7 +184,8 @@ module tb_cnn_parallel;
         $display("[Phase 1] Triggering parallel convolution start pulse...");
         @(negedge clk);
         start = 1'b1;
-        compute_start_cycle = cycle_counter; // Record cycle count at start
+        @(posedge clk);                 // DUT samples start on this rising clock edge
+        compute_start_cycle = cycle_counter; // Baseline cycle reference
         @(negedge clk);
         start = 1'b0;
 
@@ -199,14 +208,35 @@ module tb_cnn_parallel;
 
         $display("[Phase 1 Cycle Audit]");
         $display("  - Measured Buffer Preload: %0d cycles (Analytical: 9 krn + 64 img = 73)", preload_cycles);
-        $display("  - Measured Active Compute: %0d cycles (Analytical: 36 compute + 1 done = 37)", compute_cycles);
-        $display("  - Measured Total Latency:  %0d cycles (Analytical: 73 load + 37 compute = 110)", total_measured_cycles);
+        $display("  - Measured Active Compute: %0d cycles (Analytical: 1 start + 36 compute + 1 done = 38)", compute_cycles);
+        $display("  - Measured Total Latency:  %0d cycles (Analytical: 73 load + 38 compute = 111)", total_measured_cycles);
+
+        if (preload_cycles != 73) begin
+            $display("ERROR: Preload cycle mismatch! Expected 73 cycles, measured %0d cycles", preload_cycles);
+            total_errors = total_errors + 1;
+        end
+        if (compute_cycles != 38) begin
+            $display("ERROR: Compute cycle mismatch! Expected 38 cycles, measured %0d cycles", compute_cycles);
+            total_errors = total_errors + 1;
+        end
+        if (total_measured_cycles != 111) begin
+            $display("ERROR: Total cycle mismatch! Expected 111 cycles, measured %0d cycles", total_measured_cycles);
+            total_errors = total_errors + 1;
+        end
+        if (preload_cycles == 73 && compute_cycles == 38 && total_measured_cycles == 111) begin
+            $display("  - Cycle Check: PASS (Measured cycles match analytical formulation exactly)");
+        end
+        $display("[SIM_CYCLE_AUDIT] parallel_preload=%0d parallel_compute=%0d parallel_total=%0d",
+                 preload_cycles, compute_cycles, total_measured_cycles);
 
         if (output_count != 36) begin
             $display("ERROR: Phase 1 output count mismatch! Expected 36, got %0d", output_count);
             total_errors = total_errors + 1;
+        end else if (phase_val_errors != 0) begin
+            $display("ERROR: Phase 1 output value mismatch! %0d errors detected.", phase_val_errors);
+            total_errors = total_errors + 1;
         end else begin
-            $display("[Phase 1 PASS] Frame 1 completed: Exactly 36 outputs captured (1 cycle/pixel).");
+            $display("[Phase 1 PASS] Frame 1 completed: Exactly 36/36 bit-exact outputs verified (1 cycle/pixel).");
         end
 
         $fclose(outfile);
@@ -215,6 +245,8 @@ module tb_cnn_parallel;
         // Phase 2: Restart Verification (Start without reloading memory)
         // -------------------------------------------------------------
         $display("\n[Phase 2] Testing frame restart from IDLE without reloading buffers...");
+        current_phase = 2;
+        phase_val_errors = 0;
         output_count = 0;
         repeat (3) @(negedge clk);
 
@@ -229,14 +261,18 @@ module tb_cnn_parallel;
         if (output_count != 36) begin
             $display("ERROR: Phase 2 restart output count mismatch! Expected 36, got %0d", output_count);
             total_errors = total_errors + 1;
+        end else if (phase_val_errors != 0) begin
+            $display("ERROR: Phase 2 restart output value mismatch! %0d errors detected.", phase_val_errors);
+            total_errors = total_errors + 1;
         end else begin
-            $display("[Phase 2 PASS] Frame 2 restart completed: Exactly 36 outputs captured.");
+            $display("[Phase 2 PASS] Frame 2 restart completed: Exactly 36/36 bit-exact outputs verified.");
         end
 
         // -------------------------------------------------------------
         // Phase 3: Mid-Computation Reset Abort & Recovery
         // -------------------------------------------------------------
         $display("\n[Phase 3] Testing mid-computation reset abort...");
+        current_phase = 0; // Abort test
         output_count = 0;
         repeat (2) @(negedge clk);
         start = 1'b1;
@@ -258,9 +294,11 @@ module tb_cnn_parallel;
             $display("[Phase 3 PASS] DUT aborted cleanly to IDLE after reset.");
         end
 
-        // Re-load and run after abort
+        // Re-load and run after abort with complete value validation
         $display("[Phase 3] Re-loading image and restarting after abort recovery...");
         preload_buffers(1, 1);
+        current_phase = 3;
+        phase_val_errors = 0;
         output_count = 0;
         start = 1'b1;
         @(negedge clk);
@@ -272,8 +310,11 @@ module tb_cnn_parallel;
         if (output_count != 36) begin
             $display("ERROR: Phase 3 post-abort output count mismatch! Expected 36, got %0d", output_count);
             total_errors = total_errors + 1;
+        end else if (phase_val_errors != 0) begin
+            $display("ERROR: Phase 3 post-abort output value mismatch! %0d errors detected.", phase_val_errors);
+            total_errors = total_errors + 1;
         end else begin
-            $display("[Phase 3 PASS] Frame completed normally following abort recovery (36 outputs).");
+            $display("[Phase 3 PASS] Frame completed normally following abort recovery: Exactly 36/36 bit-exact outputs verified.");
         end
 
         // -------------------------------------------------------------
@@ -291,11 +332,25 @@ module tb_cnn_parallel;
         end
     end
 
-    // Synchronous Output Monitor
+    // Synchronous Output Monitor with Value Validation
     always @(posedge clk) begin
         if (out_valid) begin
-            if (frame_count == 0) begin
+            if (current_phase == 1 && frame_count == 0) begin
                 $fdisplay(outfile, "%06x", out_data);
+            end
+            if (current_phase > 0) begin
+                if (output_count < 36) begin
+                    if (out_data !== tb_expected_mem[output_count]) begin
+                        $display("ERROR: [Phase %0d Value Mismatch] Pixel %0d: Expected 0x%06x (%0d), got 0x%06x (%0d)",
+                                 current_phase, output_count, tb_expected_mem[output_count], tb_expected_mem[output_count], out_data, out_data);
+                        phase_val_errors <= phase_val_errors + 1;
+                        total_errors <= total_errors + 1;
+                    end
+                end else begin
+                    $display("ERROR: [Phase %0d] Extraneous output pulse (output_count=%0d)!", current_phase, output_count);
+                    phase_val_errors <= phase_val_errors + 1;
+                    total_errors <= total_errors + 1;
+                end
             end
             output_count <= output_count + 1;
         end

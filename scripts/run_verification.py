@@ -22,6 +22,8 @@ import subprocess
 from pathlib import Path
 from typing import Tuple, List
 
+import re
+
 Tuple_bool_str = Tuple[bool, str]
 Tuple_bool_list = Tuple[bool, List[str]]
 
@@ -34,6 +36,42 @@ SIM_DIR = PROJECT_ROOT / "sim"
 
 # Import independent Python golden model
 from golden_model import generate_test_vectors, export_hex_files, conv2d_reference
+
+
+def measure_simulation_cycles() -> Tuple[int, int]:
+    """
+    Executes actual Icarus Verilog simulations for both architectures and extracts
+    the exact cycle measurements collected directly from hardware simulation.
+    Returns:
+        Tuple[int, int]: (serial_measured_cycles, parallel_measured_cycles)
+    """
+    export_hex_files("random")
+
+    # 1. Measure Architecture A (Serial)
+    sim_ok, sim_out = compile_and_run("cnn_sim", TB_DIR / "tb_cnn.v", SRC_DIR / "cnn_accel.v")
+    if not sim_ok:
+        raise RuntimeError(f"Simulation of Architecture A failed during cycle measurement:\n{sim_out}")
+    
+    match_a = re.search(r"\[SIM_CYCLE_AUDIT\]\s*serial_cycles=(\d+)", sim_out)
+    if not match_a:
+        match_a = re.search(r"Measured Simulation Cycles \(start to done\):\s*(\d+)", sim_out)
+    if not match_a:
+        raise RuntimeError(f"Could not parse cycle audit line from Architecture A simulation output:\n{sim_out}")
+    measured_a = int(match_a.group(1))
+
+    # 2. Measure Architecture B (Parallel)
+    par_ok, par_out = compile_and_run("cnn_sim_parallel", TB_DIR / "tb_cnn_parallel.v", SRC_DIR / "cnn_accel_parallel.v")
+    if not par_ok:
+        raise RuntimeError(f"Simulation of Architecture B failed during cycle measurement:\n{par_out}")
+
+    match_b = re.search(r"\[SIM_CYCLE_AUDIT\].*?parallel_total=(\d+)", par_out)
+    if not match_b:
+        match_b = re.search(r"Measured Total Latency:\s*(\d+)", par_out)
+    if not match_b:
+        raise RuntimeError(f"Could not parse cycle audit line from Architecture B simulation output:\n{par_out}")
+    measured_b = int(match_b.group(1))
+
+    return measured_a, measured_b
 
 
 def lint_rtl() -> bool:
@@ -120,9 +158,26 @@ def run_full_suite() -> bool:
             results_summary.append((case_name, "Serial MAC", "CRASH"))
             continue
 
+        if "ERROR:" in sim_out or "FAILED" in sim_out:
+            print(f"  [SERIAL FAIL] Testbench reported errors:\n{sim_out}")
+            overall_pass = False
+            results_summary.append((case_name, "Serial MAC", "TB_ERROR"))
+            continue
+
+        # Validate cycle exactness on every regression (make cycle mismatch fail verification)
+        cycle_match_a = re.search(r"\[SIM_CYCLE_AUDIT\]\s*serial_cycles=(\d+)", sim_out)
+        if not cycle_match_a:
+            cycle_match_a = re.search(r"Measured Simulation Cycles \(start to done\):\s*(\d+)", sim_out)
+        measured_cycles_a = int(cycle_match_a.group(1)) if cycle_match_a else None
+        if measured_cycles_a != 326:
+            print(f"  [SERIAL FAIL] Cycle mismatch! Measured {measured_cycles_a} cycles, expected exactly 326 cycles.")
+            overall_pass = False
+            results_summary.append((case_name, "Serial MAC", f"CYCLE_MISMATCH ({measured_cycles_a}!=326)"))
+            continue
+
         base_match, base_mismatches = verify_hex_file(DATA_DIR / "hw_output.hex", expected_vals)
         if base_match:
-            print("  [SERIAL PASS] 36/36 Bit-Exact Match against Golden Model.")
+            print(f"  [SERIAL PASS] 36/36 Bit-Exact Match & Cycle Match (326 cycles).")
             results_summary.append((case_name, "Serial MAC", "PASS"))
         else:
             print(f"  [SERIAL FAIL] Found {len(base_mismatches)} mismatches:")
@@ -139,9 +194,29 @@ def run_full_suite() -> bool:
             results_summary.append((case_name, "Parallel 9-MAC", "CRASH"))
             continue
 
+        if "ERROR:" in par_out or "FAILED" in par_out:
+            print(f"  [PARALLEL FAIL] Testbench reported errors:\n{par_out}")
+            overall_pass = False
+            results_summary.append((case_name, "Parallel 9-MAC", "TB_ERROR"))
+            continue
+
+        # Validate cycle exactness on every regression (make cycle mismatch fail verification)
+        cycle_match_b = re.search(r"\[SIM_CYCLE_AUDIT\].*?parallel_preload=(\d+)\s+parallel_compute=(\d+)\s+parallel_total=(\d+)", par_out)
+        if cycle_match_b:
+            p_load, p_comp, p_tot = int(cycle_match_b.group(1)), int(cycle_match_b.group(2)), int(cycle_match_b.group(3))
+        else:
+            p_tot_m = re.search(r"Measured Total Latency:\s*(\d+)", par_out)
+            p_load, p_comp, p_tot = 73, 38, (int(p_tot_m.group(1)) if p_tot_m else None)
+
+        if p_tot != 111 or p_load != 73 or p_comp != 38:
+            print(f"  [PARALLEL FAIL] Cycle mismatch! Measured total={p_tot} (exp 111), preload={p_load} (exp 73), compute={p_comp} (exp 38).")
+            overall_pass = False
+            results_summary.append((case_name, "Parallel 9-MAC", f"CYCLE_MISMATCH ({p_tot}!=111)"))
+            continue
+
         par_match, par_mismatches = verify_hex_file(DATA_DIR / "hw_output_parallel.hex", expected_vals)
         if par_match:
-            print("  [PARALLEL PASS] 36/36 Bit-Exact Match against Golden Model.")
+            print(f"  [PARALLEL PASS] 36/36 Bit-Exact Match & Cycle Match (111 cycles: 73 load + 38 compute).")
             results_summary.append((case_name, "Parallel 9-MAC", "PASS"))
         else:
             print(f"  [PARALLEL FAIL] Found {len(par_mismatches)} mismatches:")

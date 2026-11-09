@@ -287,14 +287,14 @@
           </tr>
           <tr>
             <td><strong>Measured Simulation Cycles</strong></td>
-            <td><strong>325 cycles</strong> (vvp)</td>
-            <td><strong>110 cycles</strong> (vvp: 73 load + 37 comp)</td>
-            <td style="color:var(--success); font-weight:700;">2.95x Total Speedup</td>
+            <td><strong>326 cycles</strong> (vvp)</td>
+            <td><strong>111 cycles</strong> (vvp: 73 load + 38 comp)</td>
+            <td style="color:var(--success); font-weight:700;">2.94x Total Speedup</td>
           </tr>
           <tr>
             <td><strong>Analytical Cycle Formula</strong></td>
-            <td>36 * 9 + 1 = 325 cycles</td>
-            <td>73 load + 36 comp + 1 = 110 cycles</td>
+            <td>1 start + 36*9 + 1 = 326 cycles</td>
+            <td>73 load + 1 start + 36 comp + 1 = 111 cycles</td>
             <td>100% agreement with simulation</td>
           </tr>
           <tr>
@@ -305,9 +305,9 @@
           </tr>
           <tr>
             <td><strong>Inference Throughput (Total)</strong></td>
-            <td>307,692 frames/s</td>
-            <td><strong>909,091 frames/s</strong></td>
-            <td style="color:var(--success); font-weight:700;">2.95x Total Throughput</td>
+            <td>306,748 frames/s</td>
+            <td><strong>900,901 frames/s</strong></td>
+            <td style="color:var(--success); font-weight:700;">2.94x Total Throughput</td>
           </tr>
           <tr>
             <td><strong>Peak Arithmetic Density</strong></td>
@@ -319,7 +319,7 @@
             <td><strong>Standard Cell Gates (Yosys)</strong></td>
             <td><strong>2,474 gates</strong></td>
             <td>28,522 gates</td>
-            <td style="color:var(--warning);">11.53x Area Investment</td>
+            <td style="color:var(--warning);">11.53x Logic Gate Scaling</td>
           </tr>
           <tr>
             <td><strong>Cell Breakdown (ABC)</strong></td>
@@ -380,7 +380,7 @@
     <ul class="resume-list">
       <li><strong>AI Hardware Acceleration & Microarchitecture:</strong> Architected, synthesized, and verified two fixed-shape ($8\times 8$ image, $3\times 3$ kernel, $6\times 6$ output) 2D CNN Hardware Accelerators in Verilog-2001—a compact serial MAC architecture (2,474 gates) and a high-throughput 9-MAC parallel architecture (28,522 gates, single-cycle combinational adder tree, ReLU activation)—achieving a <strong>9.00x compute latency reduction (36 cycles, 1.80 GOPS)</strong>.</li>
       <li><strong>Comprehensive Verification Methodology:</strong> Built an automated offline regression test suite comparing cycle-accurate Icarus Verilog simulations against an independent Python golden reference model, achieving 100% bit-exact validation across 5 suites including boundary conditions (all zeros, max 24-bit range 585,225 saturation), restart tests, and hardware buffer write-protection verification.</li>
-      <li><strong>ASIC Gate-Level Synthesis & PPA Analysis:</strong> Executed standard cell synthesis using Yosys 0.70 and ABC, mapping RTL designs to generic CMOS logic gates to quantify silicon area vs. throughput trade-offs (2,474 vs 28,522 cells) and separating buffer preload cycles from active computation.</li>
+      <li><strong>ASIC Gate-Level Synthesis & PPA Analysis:</strong> Executed standard cell synthesis using Yosys 0.70 and ABC, mapping RTL designs to generic CMOS logic gates to quantify logic gate complexity vs. throughput trade-offs (2,474 vs 28,522 generic cells; not physical silicon area) and separating buffer preload cycles from active computation.</li>
     </ul>
   </div>
 
@@ -392,21 +392,21 @@
           "gatesSub": "Generic CMOS (569 AND, 1355 NOT, 550 OR)",
           "computeLatency": "324 cycles",
           "computeLatencySub": "3.24 μs @ 100 MHz ref (9 cycles/pixel)",
-          "totalLatency": "325 cycles",
-          "totalLatencySub": "Measured sim: 325 cyc | Preload: 0 cyc (streaming)",
+          "totalLatency": "326 cycles",
+          "totalLatencySub": "Measured sim: 326 cyc | Preload: 0 cyc (streaming)",
           "density": "200.0 MOPS",
-          "densitySub": "648 integer ops / frame (307,692 FPS)",
-          "desc": "Architecture A (Serial Baseline): Fixed-shape 1-multiplier MAC accumulating 9 products sequentially over 9 clock cycles per pixel. Area-minimal footprint."
+          "densitySub": "648 integer ops / frame (306,748 FPS)",
+          "desc": "Architecture A (Serial Baseline): Fixed-shape 1-multiplier MAC accumulating 9 products sequentially over 9 clock cycles per pixel. Area-minimal footprint (2,474 generic gates)."
         },
         "B": {
           "gates": "28,522 cells",
           "gatesSub": "Generic CMOS (7795 AND, 14926 NOT, 5217 OR)",
           "computeLatency": "36 cycles",
           "computeLatencySub": "0.36 μs @ 100 MHz ref (1 cycle/pixel)",
-          "totalLatency": "110 cycles",
-          "totalLatencySub": "Measured sim: 110 cyc (73 preload + 37 compute)",
+          "totalLatency": "111 cycles",
+          "totalLatencySub": "Measured sim: 111 cyc (73 preload + 38 compute)",
           "density": "1,800.0 MOPS (1.80 GOPS)",
-          "densitySub": "Peak streaming throughput: 2,777,778 FPS (909k with reload)",
+          "densitySub": "Peak streaming throughput: 2,777,778 FPS (900,901 with reload)",
           "desc": "Architecture B (Parallel 9-MAC): Fixed-shape 9 parallel multipliers + single-cycle combinational adder tree + ReLU. Emits 1 pixel/cycle (9.0x compute speedup)."
         }
       }
