@@ -35,7 +35,7 @@ def find_yosys_executable() -> str:
     Portably locates the Yosys executable across Linux, macOS, and Windows.
     Searches:
       1. YOSYS / YOSYS_BIN environment variable overrides
-      2. System PATH for 'yosys', 'yosys.cmd', 'yosys.exe', 'yowasp-yosys'
+      2. System PATH for 'yowasp-yosys', 'yosys', 'yosys.cmd', 'yosys.exe'
       3. Windows standard user installation path (~/.local/bin)
     """
     # 1. Environment variable override
@@ -45,8 +45,8 @@ def find_yosys_executable() -> str:
         if p.exists():
             return str(p.resolve())
 
-    # 2. PATH resolution
-    candidates = ["yosys", "yosys.cmd", "yosys.exe", "yowasp-yosys"]
+    # 2. PATH resolution (prefer yowasp-yosys for consistent ABC gate mapping)
+    candidates = ["yowasp-yosys", "yosys", "yosys.cmd", "yosys.exe"]
     for cand in candidates:
         found = shutil.which(cand)
         if found:
@@ -65,26 +65,39 @@ def find_yosys_executable() -> str:
 
 
 def run_yosys_command(cmds: str, cwd: Path) -> subprocess.CompletedProcess:
-    """Runs Yosys portably across all platforms and shell environments."""
+    """Runs Yosys portably across all platforms and shell environments via a script file."""
     yosys_bin = find_yosys_executable()
     if not yosys_bin:
         raise RuntimeError(
             "Yosys executable not found!\n"
-            "Please ensure Yosys is installed and on PATH (e.g., 'sudo apt-get install yosys' or 'pip install yowasp-yosys'), "
+            "Please ensure Yosys is installed and on PATH (e.g., 'pip install yowasp-yosys' or 'sudo apt-get install yosys yosys-abc'), "
             "or set the YOSYS environment variable."
         )
 
-    # Use shell on Windows if invoking a .cmd batch wrapper
-    use_shell = (os.name == "nt" and yosys_bin.lower().endswith(".cmd"))
-    cmd_args = [yosys_bin, "-p", cmds]
+    # Normalize semicolon-delimited commands to lines for robust script execution
+    script_lines = [c.strip() for c in cmds.split(";") if c.strip()]
+    script_file = cwd / "_run_yosys.ys"
+    script_file.write_text("\n".join(script_lines) + "\n", encoding="utf-8")
 
-    return subprocess.run(
-        cmd_args,
-        cwd=str(cwd),
-        shell=use_shell,
-        capture_output=True,
-        text=True
-    )
+    use_shell = (os.name == "nt" and yosys_bin.lower().endswith(".cmd"))
+    cmd_args = [yosys_bin, "-s", script_file.name]
+
+    try:
+        proc = subprocess.run(
+            cmd_args,
+            cwd=str(cwd),
+            shell=use_shell,
+            capture_output=True,
+            text=True
+        )
+    finally:
+        if script_file.exists():
+            try:
+                script_file.unlink()
+            except Exception:
+                pass
+
+    return proc
 
 
 def synthesize_module(module_name: str, verilog_file: str) -> dict:
@@ -111,7 +124,10 @@ def synthesize_module(module_name: str, verilog_file: str) -> dict:
 
     if proc.returncode != 0:
         print(f"ERROR: Synthesis failed for {module_name} with exit code {proc.returncode}!")
-        print(proc.stderr)
+        if proc.stdout:
+            print("[Yosys STDOUT]:\n" + proc.stdout)
+        if proc.stderr:
+            print("[Yosys STDERR]:\n" + proc.stderr)
         raise RuntimeError(f"Yosys synthesis failed for {module_name}")
 
     # Stat run on the synthesized netlist
@@ -119,6 +135,10 @@ def synthesize_module(module_name: str, verilog_file: str) -> dict:
     stat_proc = run_yosys_command(stat_cmd, cwd=SRC_DIR)
 
     if stat_proc.returncode != 0:
+        if stat_proc.stdout:
+            print("[Yosys Stat STDOUT]:\n" + stat_proc.stdout)
+        if stat_proc.stderr:
+            print("[Yosys Stat STDERR]:\n" + stat_proc.stderr)
         raise RuntimeError(f"Yosys stat failed on {synth_out_verilog}")
 
     stat_text = stat_proc.stdout

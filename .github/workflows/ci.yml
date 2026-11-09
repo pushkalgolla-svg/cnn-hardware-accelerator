@@ -23,13 +23,15 @@ jobs:
       - name: Install EDA Tools (Icarus Verilog & Yosys)
         run: |
           sudo apt-get update
-          sudo apt-get install -y iverilog yosys
+          sudo apt-get install -y iverilog yosys yosys-abc
+          pip install yowasp-yosys
 
       - name: Verify Toolchain Installation
         run: |
           python3 --version
           iverilog -V
-          yosys -V
+          which yowasp-yosys || which yosys
+          yowasp-yosys -V || yosys -V
 
       - name: Generate Independent Golden Vectors
         run: |
