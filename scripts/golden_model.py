@@ -1,80 +1,165 @@
 #!/usr/bin/env python3
 """
 scripts/golden_model.py
-Generates random 8x8 image and 3x3 kernel (8-bit unsigned integers),
-computes 2D valid convolution reference output, and exports hex data files.
+Independent Python Software Golden Reference Model for 2D CNN Hardware Accelerators.
+
+Validates 8x8 image (64 unsigned 8-bit integers) convolved with 3x3 kernel
+(9 unsigned 8-bit weights) producing a 6x6 output feature map (36 outputs).
+Supports multiple test vectors: normal random, all zeros, all max, checkerboard, impulse.
 """
 
-import os
+import sys
 import random
 from pathlib import Path
+from typing import List, Tuple, Dict, Any
 
-def generate_and_save():
-    # Set seed for deterministic reproducibility
-    random.seed(42)
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    script_dir = Path(__file__).resolve().parent
-    project_root = script_dir.parent
-    data_dir = project_root / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Generate 8x8 image (64 elements, 8-bit unsigned: 0 to 255)
-    image = [[random.randint(0, 255) for _ in range(8)] for _ in range(8)]
+def conv2d_reference(image: List[List[int]], kernel: List[List[int]]) -> List[int]:
+    """
+    Computes bit-exact 2D valid convolution of 8x8 image with 3x3 kernel.
+    Returns 36 flattened output values (row-major order).
+    """
+    if len(image) != 8 or any(len(row) != 8 for row in image):
+        raise ValueError("Image must be an 8x8 matrix.")
+    if len(kernel) != 3 or any(len(row) != 3 for row in kernel):
+        raise ValueError("Kernel must be a 3x3 matrix.")
 
-    # 2. Generate 3x3 kernel (9 elements, 8-bit unsigned: 0 to 255)
-    kernel = [[random.randint(0, 255) for _ in range(3)] for _ in range(3)]
+    for r in range(8):
+        for c in range(8):
+            val = image[r][c]
+            if not (0 <= val <= 255):
+                raise ValueError(f"Image pixel at ({r},{c}) is {val}, outside unsigned 8-bit range [0, 255].")
 
-    # 3. Compute 2D valid convolution: (8 - 3 + 1) x (8 - 3 + 1) = 6x6 output
-    out_height = 8 - 3 + 1
-    out_width = 8 - 3 + 1
-    expected_output = []
+    for kr in range(3):
+        for kc in range(3):
+            val = kernel[kr][kc]
+            if not (0 <= val <= 255):
+                raise ValueError(f"Kernel weight at ({kr},{kc}) is {val}, outside unsigned 8-bit range [0, 255].")
 
-    for r in range(out_height):
-        row_out = []
-        for c in range(out_width):
-            acc = 0
+    out_h = 8 - 3 + 1  # 6
+    out_w = 8 - 3 + 1  # 6
+    outputs = []
+
+    for r in range(out_h):
+        for c in range(out_w):
+            accum = 0
             for ki in range(3):
                 for kj in range(3):
-                    acc += image[r + ki][c + kj] * kernel[ki][kj]
-            row_out.append(acc)
-        expected_output.append(row_out)
+                    accum += image[r + ki][c + kj] * kernel[ki][kj]
+            outputs.append(accum)
 
-    # 4. Flatten arrays
-    flat_image = [pixel for row in image for pixel in row]
-    flat_kernel = [weight for row in kernel for weight in row]
-    flat_expected = [val for row in expected_output for val in row]
+    assert len(outputs) == 36, f"Expected 36 outputs, got {len(outputs)}"
+    return outputs
 
-    # 5. Format as space-separated hexadecimal strings
-    image_hex_str = " ".join(f"{val:02x}" for val in flat_image)
-    kernel_hex_str = " ".join(f"{val:02x}" for val in flat_kernel)
-    # Output values can exceed 16-bit (max = 9 * 255 * 255 = 585225 = 0x8EE09), 6 hex digits covers it
-    expected_hex_str = " ".join(f"{val:06x}" for val in flat_expected)
 
-    # 6. Save to data directory
-    image_path = data_dir / "image.hex"
-    kernel_path = data_dir / "kernel.hex"
-    expected_path = data_dir / "expected_output.hex"
+def generate_test_vectors() -> Dict[str, Dict[str, Any]]:
+    """Generates a comprehensive suite of normal and boundary test vectors."""
+    vectors = {}
 
-    image_path.write_text(image_hex_str + "\n", encoding="utf-8")
-    kernel_path.write_text(kernel_hex_str + "\n", encoding="utf-8")
-    expected_path.write_text(expected_hex_str + "\n", encoding="utf-8")
+    # 1. Deterministic Random (Normal case, seed 42)
+    rng = random.Random(42)
+    img_rand = [[rng.randint(0, 255) for _ in range(8)] for _ in range(8)]
+    krn_rand = [[rng.randint(0, 255) for _ in range(3)] for _ in range(3)]
+    vectors["random"] = {
+        "description": "Deterministic pseudo-random 8-bit distribution (seed 42)",
+        "image": img_rand,
+        "kernel": krn_rand,
+        "expected": conv2d_reference(img_rand, krn_rand),
+    }
 
-    print("========================================")
-    print("CNN Golden Model Data Generation")
-    print("========================================")
-    print(f"Generated 8x8 Image (64 elements) -> {image_path}")
-    print(f"Generated 3x3 Kernel (9 elements)  -> {kernel_path}")
-    print(f"Computed 6x6 Output (36 elements) -> {expected_path}")
-    print("\n--- 3x3 Kernel (Decimal) ---")
-    for row in kernel:
-        print("  " + " ".join(f"{v:3d}" for v in row))
-    print("\n--- 8x8 Image Sample (First 3 rows) ---")
-    for row in image[:3]:
-        print("  " + " ".join(f"{v:3d}" for v in row))
-    print("\n--- 6x6 Expected Output (First row, Decimal & Hex) ---")
-    print("  Dec: " + " ".join(f"{v:7d}" for v in expected_output[0]))
-    print("  Hex: " + " ".join(f"{v:06x}" for v in expected_output[0]))
-    print("========================================")
+    # 2. Boundary: All Zeros
+    img_zeros = [[0 for _ in range(8)] for _ in range(8)]
+    krn_zeros = [[0 for _ in range(3)] for _ in range(3)]
+    vectors["all_zeros"] = {
+        "description": "Boundary condition: All zeros (Image=0, Kernel=0)",
+        "image": img_zeros,
+        "kernel": krn_zeros,
+        "expected": conv2d_reference(img_zeros, krn_zeros),
+    }
+
+    # 3. Boundary: All Max (255) - Tests maximum dynamic range without accumulator overflow
+    img_max = [[255 for _ in range(8)] for _ in range(8)]
+    krn_max = [[255 for _ in range(3)] for _ in range(3)]
+    vectors["all_max"] = {
+        "description": "Boundary condition: Maximum range (All 255, tests 24-bit accumulator)",
+        "image": img_max,
+        "kernel": krn_max,
+        "expected": conv2d_reference(img_max, krn_max),
+    }
+
+    # 4. Pattern: Alternating Checkerboard (0xAA = 170, 0x55 = 85)
+    img_check = [[170 if (r + c) % 2 == 0 else 85 for c in range(8)] for r in range(8)]
+    krn_check = [[85 if (r + c) % 2 == 0 else 170 for c in range(3)] for r in range(3)]
+    vectors["checkerboard"] = {
+        "description": "High-frequency switching checkerboard pattern (0xAA / 0x55)",
+        "image": img_check,
+        "kernel": krn_check,
+        "expected": conv2d_reference(img_check, krn_check),
+    }
+
+    # 5. Impulse: Single non-zero center pixel and single center weight
+    img_impulse = [[0 for _ in range(8)] for _ in range(8)]
+    img_impulse[3][3] = 128
+    krn_impulse = [[0 for _ in range(3)] for _ in range(3)]
+    krn_impulse[1][1] = 64
+    vectors["impulse"] = {
+        "description": "Spatial impulse response test (single non-zero pixel & weight)",
+        "image": img_impulse,
+        "kernel": krn_impulse,
+        "expected": conv2d_reference(img_impulse, krn_impulse),
+    }
+
+    return vectors
+
+
+def export_hex_files(case_name: str = "random", prefix: str = ""):
+    """Exports a specified test vector case to standard .hex format in the data directory."""
+    vectors = generate_test_vectors()
+    if case_name not in vectors:
+        raise KeyError(f"Unknown test case '{case_name}'. Available: {list(vectors.keys())}")
+
+    case = vectors[case_name]
+    flat_img = [p for row in case["image"] for p in row]
+    flat_krn = [w for row in case["kernel"] for w in row]
+    flat_exp = case["expected"]
+
+    pfx = f"{prefix}_" if prefix else ""
+    img_path = DATA_DIR / f"{pfx}image.hex"
+    krn_path = DATA_DIR / f"{pfx}kernel.hex"
+    exp_path = DATA_DIR / f"{pfx}expected_output.hex"
+
+    img_path.write_text(" ".join(f"{x:02x}" for x in flat_img) + "\n", encoding="utf-8")
+    krn_path.write_text(" ".join(f"{x:02x}" for x in flat_krn) + "\n", encoding="utf-8")
+    exp_path.write_text(" ".join(f"{x:06x}" for x in flat_exp) + "\n", encoding="utf-8")
+
+    return img_path, krn_path, exp_path
+
+
+def main():
+    print("==============================================================")
+    print("     CNN Accelerator Python Golden Model & Vector Generator    ")
+    print("==============================================================")
+
+    vectors = generate_test_vectors()
+    print(f"Generated {len(vectors)} independent test suites:")
+    for name, v in vectors.items():
+        exp = v["expected"]
+        print(f"  [{name:<13}] {v['description']}")
+        print(f"                Outputs: min={min(exp):<7d} max={max(exp):<7d} (0x{max(exp):06x})")
+
+    # Export default 'random' dataset into primary data files
+    img_p, krn_p, exp_p = export_hex_files("random")
+    print(f"\n[Export Complete] Primary hex files updated in {DATA_DIR}:")
+    print(f"  - Image:    {img_p.name} (64 hex bytes)")
+    print(f"  - Kernel:   {krn_p.name} (9 hex bytes)")
+    print(f"  - Expected: {exp_p.name} (36 hex words)")
+    print("==============================================================")
+
 
 if __name__ == "__main__":
-    generate_and_save()
+    main()

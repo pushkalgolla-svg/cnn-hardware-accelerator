@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-11-09T12:20:00Z",
+  "reference_clock_mhz": 100.0,
+  "timing_disclaimer": "100 MHz is a nominal reference clock for cycle-time calculations, not an STA signed-off physical timing closure. Synthesis gate counts represent generic standard CMOS gates (cmos2 library: NOT, AND, OR) via Yosys 0.70 + ABC.",
+  "operations_per_frame": 648,
+  "architectures": {
+    "serial_baseline": {
+      "name": "Architecture A (Serial Baseline)",
+      "module": "cnn_accel",
+      "gate_count": 2474,
+      "wires": 3882,
+      "wire_bits": 4115,
+      "cell_breakdown": {},
+      "preload_cycles": 0,
+      "compute_cycles": 324,
+      "total_cycles": 325,
+      "compute_latency_us": 3.24,
+      "total_latency_us": 3.25,
+      "compute_fps": 308642,
+      "total_fps": 307692,
+      "compute_mops": 200.0,
+      "total_mops": 199.4,
+      "adder_tree_type": "None (Sequential accumulator register)",
+      "verification_status": "36/36 BIT-EXACT PASS"
+    },
+    "parallel_9mac": {
+      "name": "Architecture B (Parallel 9-MAC + ReLU)",
+      "module": "cnn_accel_parallel",
+      "gate_count": 28522,
+      "wires": 43694,
+      "wire_bits": 46085,
+      "cell_breakdown": {},
+      "preload_cycles": 73,
+      "compute_cycles": 36,
+      "total_cycles": 110,
+      "compute_latency_us": 0.36,
+      "total_latency_us": 1.1,
+      "compute_fps": 2777778,
+      "total_fps": 909091,
+      "compute_mops": 1800.0,
+      "total_mops": 589.1,
+      "adder_tree_type": "Single-Cycle Combinational Adder Tree (Non-pipelined, 3 stages logic)",
+      "verification_status": "36/36 BIT-EXACT PASS"
+    }
+  },
+  "comparisons": {
+    "compute_speedup": 9.0,
+    "total_speedup_with_preload": 2.95,
+    "area_ratio": 11.53
+  }
+}

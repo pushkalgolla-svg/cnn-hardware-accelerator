@@ -1,0 +1,43 @@
+name: Hardware Verification CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    name: RTL Lint & Multi-Vector Simulation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+
+      - name: Verify Toolchain
+        run: |
+          python3 --version
+          iverilog -V
+
+      - name: Generate Independent Golden Vectors
+        run: |
+          python3 scripts/golden_model.py
+
+      - name: Run Multi-Vector RTL Regression Suite (iverilog + vvp)
+        run: |
+          python3 scripts/run_verification.py
+
+      - name: Run Architectural Comparison & Sanity Checks
+        run: |
+          python3 scripts/compare_architectures.py
