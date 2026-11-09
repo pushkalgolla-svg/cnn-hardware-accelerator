@@ -139,8 +139,12 @@ module cnn_accel_parallel (
     wire [19:0] raw_conv_sum = sum_s3_0 + {1'b0, sum_s2_2};
 
     // ReLU Activation Function: f(x) = max(0, x)
-    // For unsigned 8-bit operands, raw_conv_sum is always non-negative.
-    // Zero-extended to 24 bits for interface consistency with serial architecture.
+    // MATHEMATICAL NOTE ON RELU REDUNDANCY:
+    // Because inputs and weights are strictly unsigned 8-bit integers (0 to 255),
+    // every product (p * k) >= 0 and the raw convolution sum is always non-negative (>= 0).
+    // Therefore, ReLU(x) = max(0, x) == x is mathematically redundant for this unsigned datapath.
+    // It is included as an architectural placeholder for future signed (two's complement) extensions.
+    // Zero-extended to 24 bits for interface consistency with the serial architecture.
     wire [23:0] relu_output = {4'b0000, raw_conv_sum};
 
     // Main Control FSM & Output Pipeline (Synchronous Reset)

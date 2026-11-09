@@ -1,4 +1,4 @@
-# Parameterized CNN Hardware Accelerators & Microarchitecture Trade-off Study
+# Fixed-Shape (8×8) CNN Hardware Accelerators & Microarchitecture Trade-off Study
 
 [![Verilog-2001](https://img.shields.io/badge/Verilog-2001-blue.svg)](https://en.wikipedia.org/wiki/Verilog)
 [![Simulator](https://img.shields.io/badge/Simulator-Icarus_Verilog_12.0-green.svg)](https://steveicarus.github.io/iverilog/)
@@ -13,7 +13,9 @@
 
 ## 🌟 Overview & Engineering Highlights
 
-This repository contains synthesizable Verilog-2001 RTL designs, race-free verification testbenches, and open-source EDA synthesis automation for two contrasting integer 2D Convolution CNN Accelerators:
+This repository contains synthesizable Verilog-2001 RTL designs, race-free verification testbenches, and open-source EDA synthesis automation for two contrasting integer 2D Convolution CNN Accelerators.
+
+> **Design Scope**: Both architectures implement a **fixed-shape 2D convolution** operating on an $8 \times 8$ unsigned 8-bit input image and a $3 \times 3$ unsigned 8-bit filter kernel, producing a $6 \times 6$ feature map (exactly 36 output values). Hardcoded coordinate boundaries are utilized for optimal area without parameterized loop overhead.
 
 1. **Architecture A (Serial Baseline)**:
    - **Datapath**: 1 dedicated $8 \times 8$-bit unsigned hardware multiplier and a 24-bit accumulator register.
@@ -22,11 +24,12 @@ This repository contains synthesizable Verilog-2001 RTL designs, race-free verif
    - **Latency**: 324 active compute cycles (9 cycles/pixel $\times$ 36 pixels) + 1 cycle done pulse = 325 total execution cycles.
 
 2. **Architecture B (Parallel 9-MAC + Combinational Tree)**:
-   - **Datapath**: 9 parallel spatial multipliers ($8\text{-bit} \times 8\text{-bit} \to 16\text{-bit}$) feeding a **single-cycle combinational adder tree** (non-pipelined, 3 stages of combinational adders) and ReLU activation ($\max(0, X)$).
+   - **Datapath**: 9 parallel spatial multipliers ($8\text{-bit} \times 8\text{-bit} \to 16\text{-bit}$) feeding a **single-cycle combinational adder tree** (non-pipelined, 3 stages of combinational adders) and ReLU activation.
+   - **ReLU Mathematical Redundancy**: For unsigned 8-bit inputs and weights, all products and accumulations are strictly non-negative ($\ge 0$). Consequently, $\text{ReLU}(X) = \max(0, X) \equiv X$ is an identity operation. It is retained as a zero-cost architectural hook for future signed arithmetic extensions.
    - **Internal Buffers**: Multi-port register storage for a 64-pixel image ($64 \times 8\text{-bit}$) and 9-weight filter ($9 \times 8\text{-bit}$).
    - **Hardware Safety Guards**:
-     - *Buffer Write-Protection*: Buffer writes are strictly prohibited during the `COMPUTE` state.
-     - *Address Validation*: Address decoding prevents out-of-bounds array access (guarding `kernel_wr_addr < 9`).
+     - *Buffer Write-Protection*: Buffer writes are strictly prohibited during the `COMPUTE` state (`state == IDLE` guard).
+     - *Address Validation*: Address decoding prevents out-of-bounds array access (guarding `kernel_wr_addr < 4'd9`).
    - **Throughput & Speedup**: Computes 1 output pixel per clock cycle. Emits all 36 pixels in **36 active compute cycles** (**$9.00\times$ active compute speedup**).
    - **Area Footprint**: **28,522 standard CMOS gates** ($11.53\times$ area investment for $9.0\times$ arithmetic throughput).
 
@@ -49,12 +52,30 @@ All synthesis metrics are extracted reproducibly under identical Yosys + ABC set
 | **Inference Throughput (Total)** | $307,692$ frames/sec | **$909,091$ frames/sec** | $2.95\times$ Higher Throughput |
 | **Peak Arithmetic Density** | $200.0$ MOPS | **$1,800.0$ MOPS ($1.80$ GOPS)** | $9.00\times$ Compute Density |
 | **Standard Cell Gates (Yosys)** | **2,474 gates** | **28,522 gates** | $11.53\times$ Silicon Area Investment |
-| **Interconnect Wires** | $3,882$ wires | $43,694$ wires | $11.26\times$ Wiring Complexity |
-| **Total Wire Bits** | $4,115$ wire bits | $46,085$ wire bits | $11.20\times$ Interconnect Density |
-| **Gate Breakdown** | $569$ AND, $1,355$ NOT, $550$ OR | $7,795$ AND, $14,926$ NOT, $5,217$ OR | Optimized via ABC technology mapping |
+| **Logical Nets (RTLIL Wires)\*\***| $3,882$ wires | $43,694$ wires | $11.26\times$ Logical Net Count |
+| **Logical Wire Bits\*\*** | $4,115$ wire bits | $46,085$ wire bits | $11.20\times$ Net Bit Complexity |
+| **Gate Breakdown** | $569$ AND, $1,355$ NOT, $550$ OR | $7,795$ AND, $584$ LOGIC\_NOT, $14,926$ NOT, $5,217$ OR | Optimized via ABC technology mapping |
 | **Multi-Vector Regression** | **100% Bit-Exact PASS (5 suites)** | **100% Bit-Exact PASS (5 suites)** | Verified against Python reference |
 
-*\*Note: 100 MHz is a nominal reference clock for architectural cycle-time conversion ($10\,\text{ns}$ period), not a signed-off physical Static Timing Analysis (STA) timing closure, which requires foundry-specific standard cell PDKs and parasitic extraction.*
+*\*Note on STA: 100 MHz is an assumed nominal reference clock for architectural cycle-time conversion ($10\,\text{ns}$ period), not a signed-off physical Static Timing Analysis (STA) timing closure, which requires foundry-specific standard cell PDKs, sign-off STA tools (e.g., OpenSTA), and parasitic extraction.*  
+*\*\*Note on Wires: Yosys wire counts quantify RTLIL netlist connectivity nets and bits, not physical metal routing tracks or wirelength measurements, which require physical Place & Route (P&R).*
+
+---
+
+### ⏱️ Measured Simulation Cycles vs. Analytical Estimates
+
+Cycle accounting is rigorously measured in cycle-accurate Icarus Verilog simulations and compared against analytical derivations:
+
+| Architecture | Phase | Analytical Formulation | Analytical Cycles | Measured Sim Cycles | Match |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Architecture A (Serial)** | Preload | Streaming reads during compute | 0 | **0** | Exact |
+| | Compute | $36 \text{ pixels} \times 9 \text{ MACs/pixel}$ | 324 | **324** | Exact |
+| | Completion | State transition to `DONE` pulse | 1 | **1** | Exact |
+| | **Total** | $0 + 324 + 1$ | **325** | **325** | Exact |
+| **Architecture B (Parallel)** | Preload | $9 \text{ (kernel)} + 64 \text{ (image)}$ | 73 | **73** | Exact |
+| | Compute | $36 \text{ pixels} \times 1 \text{ cycle/pixel}$ | 36 | **36** | Exact |
+| | Completion | State transition to `IDLE` + done pulse | 1 | **1** | Exact |
+| | **Total** | $73 + 36 + 1$ | **110** | **110** | Exact |
 
 ---
 
@@ -129,17 +150,19 @@ python scripts/synth_benchmark.py
 python scripts/compare_architectures.py
 ```
 
-### 4. Optional: Run AI Hardware Architect (Gemini API)
-Generates and isolates candidate RTL in `src/candidates/` without modifying validated RTL:
+### 4. Secure AI Candidate Promotion Pipeline
+The orchestrator implements strict hardware promotion safety: candidates are generated in isolation (`src/candidates/`), compiled in a sandbox, and simulated against all 5 golden model suites. Validated RTL is **never** overwritten unless every test passes with 36/36 bit-exact outputs and `--promote` is explicitly commanded.
+
 ```bash
-# Set your API key
+# Validate an existing candidate RTL in isolation (100% offline, no API key):
+python scripts/orchestrator.py --validate-candidate src/candidates/cnn_accel_candidate.v
+
+# Validate and promote to src/cnn_accel.v ONLY if all 5 test suites pass:
+python scripts/orchestrator.py --validate-candidate src/candidates/cnn_accel_candidate.v --promote
+
+# Optional: Run online AI Architect generation with Gemini API:
 export GEMINI_API_KEY="your_api_key_here"
-
-# Run generator in isolated candidate mode
 python scripts/orchestrator.py
-
-# To promote verified candidate to active RTL:
-python scripts/orchestrator.py --promote
 ```
 
 ### 5. Launch Interactive Visual Dashboard

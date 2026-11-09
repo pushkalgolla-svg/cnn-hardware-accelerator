@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CNN Hardware Accelerator: Microarchitecture & Verification Dashboard</title>
+  <title>CNN Hardware Accelerator: Fixed-Shape Microarchitecture & Verification Dashboard</title>
   <style>
     :root {
       --bg: #090d16;
@@ -24,9 +24,9 @@
 
     header {
       display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;
-      margin-bottom: 1.5rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1.25rem;
+      margin-bottom: 1.25rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1.25rem;
     }
-    .header-title h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+    .header-title h1 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; }
     .header-title p { color: var(--text-muted); font-size: 0.88rem; margin-top: 0.25rem; }
 
     .badge-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -41,15 +41,15 @@
     }
 
     .disclaimer-banner {
-      background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(56, 189, 248, 0.25);
-      border-left: 4px solid var(--accent); border-radius: 8px; padding: 0.75rem 1rem;
-      font-size: 0.82rem; color: #cbd5e1; margin-bottom: 1.5rem;
+      background: rgba(30, 41, 59, 0.65); border: 1px solid rgba(56, 189, 248, 0.25);
+      border-left: 4px solid var(--accent); border-radius: 8px; padding: 0.85rem 1rem;
+      font-size: 0.82rem; color: #cbd5e1; margin-bottom: 1.25rem; line-height: 1.6;
     }
     .disclaimer-banner strong { color: var(--accent); }
 
     .arch-toggle-container {
       display: flex; flex-wrap: wrap; gap: 0.5rem; background: rgba(0,0,0,0.4); padding: 4px;
-      border-radius: 10px; margin-bottom: 1.5rem; border: 1px solid var(--card-border); width: fit-content;
+      border-radius: 10px; margin-bottom: 1.25rem; border: 1px solid var(--card-border); width: fit-content;
     }
     .arch-btn {
       padding: 0.5rem 1.25rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer;
@@ -150,8 +150,8 @@
 
   <header>
     <div class="header-title">
-      <h1>AI-Designed CNN Hardware Accelerator & Architecture Study</h1>
-      <p>Verilog-2001 Synthesizable RTL • Yosys 0.70 ASIC Logic Mapping • 100% Bit-Exact Verification</p>
+      <h1>Fixed-Shape CNN Hardware Accelerator & Architecture Study</h1>
+      <p>Fixed 8×8 Image, 3×3 Kernel, 6×6 Output • Verilog-2001 RTL • Yosys 0.70 CMOS Synthesis • 100% Bit-Exact</p>
     </div>
     <div class="badge-group">
       <span class="badge">10/10 REGRESSIONS PASS</span>
@@ -161,7 +161,14 @@
   </header>
 
   <div class="disclaimer-banner">
-    <strong>Engineering Methodology Notice:</strong> This interactive web interface is a client-side visual simulation and architectural exploration tool. Full cycle-accurate digital simulations were conducted locally using <strong>Icarus Verilog (<code>iverilog</code>/<code>vvp</code>)</strong>, and gate-level standard cell area benchmarks were extracted via <strong>Yosys Open Synthesis Suite + ABC</strong>.
+    <strong>Engineering & Verification Disclaimers:</strong>
+    <ul style="margin-left: 1.25rem; margin-top: 0.35rem; list-style: disc;">
+      <li><strong>Client-Side Visualization:</strong> This web interface visualizes the hardware dataflow in pure client-side JavaScript. Cycle-accurate digital simulations were executed locally using <strong>Icarus Verilog (<code>iverilog</code>/<code>vvp</code>)</strong>, and gate counts were generated using <strong>Yosys Open Synthesis Suite + ABC</strong>.</li>
+      <li><strong>Design Scope:</strong> The current RTL is a <strong>fixed-shape</strong> architecture designed for an 8×8 image, 3×3 kernel, and 6×6 feature map (not a dynamically parameterized matrix engine).</li>
+      <li><strong>Timing Disclaimer:</strong> 100 MHz (10 ns clock period) is an assumed nominal reference clock for cycle-to-time conversion in benchmarks, <strong>NOT</strong> a signed-off Static Timing Analysis (STA) timing closure.</li>
+      <li><strong>Routing Note:</strong> Netlist wire counts represent internal Yosys RTLIL logical net connections, <strong>NOT</strong> physical chip routing tracks or parasitic interconnect metrics.</li>
+      <li><strong>ReLU Note:</strong> For unsigned 8-bit integers, all products and accumulations are strictly non-negative (≥ 0). Thus, ReLU(X) = max(0, X) ≡ X is mathematically redundant for this unsigned datapath and serves as an architectural placeholder for future signed extensions.</li>
+    </ul>
   </div>
 
   <div class="arch-toggle-container">
@@ -173,17 +180,17 @@
     <div class="stat-card">
       <div class="stat-label">Yosys Standard Cell Gates</div>
       <div class="stat-val" id="stat-gates">2,474 cells</div>
-      <div class="stat-sub" id="stat-gates-sub">Generic CMOS (cmos2: NOT, AND, OR)</div>
+      <div class="stat-sub" id="stat-gates-sub">Generic CMOS (569 AND, 1355 NOT, 550 OR)</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Active Compute Latency</div>
       <div class="stat-val" id="stat-latency">324 cycles</div>
-      <div class="stat-sub" id="stat-latency-sub">3.24 μs @ 100 MHz (9 cycles/pixel)</div>
+      <div class="stat-sub" id="stat-latency-sub">3.24 μs @ 100 MHz ref (9 cycles/pixel)</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Total Latency (with Preload)</div>
+      <div class="stat-label">Total Execution Latency</div>
       <div class="stat-val" id="stat-total-lat">325 cycles</div>
-      <div class="stat-sub" id="stat-total-lat-sub">Preload: 0 cyc (streaming memory reads)</div>
+      <div class="stat-sub" id="stat-total-lat-sub">Measured sim: 325 cyc | Preload: 0 cyc (streaming)</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Peak Arithmetic Density</div>
@@ -243,6 +250,12 @@
         </thead>
         <tbody>
           <tr>
+            <td><strong>Design Dimensions</strong></td>
+            <td>Fixed 8x8 -> 6x6 output</td>
+            <td>Fixed 8x8 -> 6x6 output</td>
+            <td>Hardcoded coordinate bounds</td>
+          </tr>
+          <tr>
             <td><strong>Arithmetic Datapath</strong></td>
             <td>1 Multiplier + Acc</td>
             <td><strong>9 Multipliers + Adder Tree</strong></td>
@@ -253,6 +266,12 @@
             <td>Sequential Accumulator</td>
             <td><strong>Single-Cycle Combinational</strong></td>
             <td>Non-pipelined (3 stages logic)</td>
+          </tr>
+          <tr>
+            <td><strong>ReLU Activation</strong></td>
+            <td>N/A</td>
+            <td>max(0, X) [Redundant for uint]</td>
+            <td>Placeholder for signed support</td>
           </tr>
           <tr>
             <td><strong>Buffer Preload Latency</strong></td>
@@ -267,16 +286,28 @@
             <td style="color:var(--success); font-weight:700;">9.00x Compute Speedup</td>
           </tr>
           <tr>
-            <td><strong>Total Frame Latency</strong></td>
-            <td>325 cycles (3.25 μs)</td>
-            <td><strong>110 cycles (1.10 μs)</strong></td>
+            <td><strong>Measured Simulation Cycles</strong></td>
+            <td><strong>325 cycles</strong> (vvp)</td>
+            <td><strong>110 cycles</strong> (vvp: 73 load + 37 comp)</td>
             <td style="color:var(--success); font-weight:700;">2.95x Total Speedup</td>
           </tr>
           <tr>
-            <td><strong>Inference Throughput</strong></td>
+            <td><strong>Analytical Cycle Formula</strong></td>
+            <td>36 * 9 + 1 = 325 cycles</td>
+            <td>73 load + 36 comp + 1 = 110 cycles</td>
+            <td>100% agreement with simulation</td>
+          </tr>
+          <tr>
+            <td><strong>Inference Throughput (Compute)</strong></td>
+            <td>308,642 frames/s</td>
+            <td><strong>2,777,778 frames/s</strong></td>
+            <td style="color:var(--success); font-weight:700;">9.00x Compute Throughput</td>
+          </tr>
+          <tr>
+            <td><strong>Inference Throughput (Total)</strong></td>
             <td>307,692 frames/s</td>
             <td><strong>909,091 frames/s</strong></td>
-            <td style="color:var(--success); font-weight:700;">2.95x Higher (9.0x streaming)</td>
+            <td style="color:var(--success); font-weight:700;">2.95x Total Throughput</td>
           </tr>
           <tr>
             <td><strong>Peak Arithmetic Density</strong></td>
@@ -291,10 +322,16 @@
             <td style="color:var(--warning);">11.53x Area Investment</td>
           </tr>
           <tr>
-            <td><strong>Interconnect Wires</strong></td>
-            <td>3,882 wires</td>
-            <td>43,694 wires</td>
-            <td>11.26x Wiring Complexity</td>
+            <td><strong>Cell Breakdown (ABC)</strong></td>
+            <td>569 AND, 1355 NOT, 550 OR</td>
+            <td>7795 AND, 14926 NOT, 5217 OR</td>
+            <td>Generic CMOS logic gates</td>
+          </tr>
+          <tr>
+            <td><strong>RTLIL Logical Nets*</strong></td>
+            <td>3,882 nets</td>
+            <td>43,694 nets</td>
+            <td>11.26x Logical Nets (Not routing)</td>
           </tr>
           <tr>
             <td><strong>Multi-Vector Verification</strong></td>
@@ -341,7 +378,7 @@
   <div class="resume-section">
     <h2>Resume Bullet Points (ASIC / FPGA RTL Engineering)</h2>
     <ul class="resume-list">
-      <li><strong>AI Hardware Acceleration & Microarchitecture:</strong> Architected, synthesized, and verified two 2D CNN Hardware Accelerators in Verilog-2001—a compact serial MAC architecture (2,474 gates) and a high-throughput 9-MAC parallel architecture (28,522 gates, single-cycle combinational adder tree, ReLU activation)—achieving a <strong>9.00x compute latency reduction (36 cycles, 1.80 GOPS)</strong>.</li>
+      <li><strong>AI Hardware Acceleration & Microarchitecture:</strong> Architected, synthesized, and verified two fixed-shape ($8\times 8$ image, $3\times 3$ kernel, $6\times 6$ output) 2D CNN Hardware Accelerators in Verilog-2001—a compact serial MAC architecture (2,474 gates) and a high-throughput 9-MAC parallel architecture (28,522 gates, single-cycle combinational adder tree, ReLU activation)—achieving a <strong>9.00x compute latency reduction (36 cycles, 1.80 GOPS)</strong>.</li>
       <li><strong>Comprehensive Verification Methodology:</strong> Built an automated offline regression test suite comparing cycle-accurate Icarus Verilog simulations against an independent Python golden reference model, achieving 100% bit-exact validation across 5 suites including boundary conditions (all zeros, max 24-bit range 585,225 saturation), restart tests, and hardware buffer write-protection verification.</li>
       <li><strong>ASIC Gate-Level Synthesis & PPA Analysis:</strong> Executed standard cell synthesis using Yosys 0.70 and ABC, mapping RTL designs to generic CMOS logic gates to quantify silicon area vs. throughput trade-offs (2,474 vs 28,522 cells) and separating buffer preload cycles from active computation.</li>
     </ul>
@@ -354,23 +391,23 @@
           "gates": "2,474 cells",
           "gatesSub": "Generic CMOS (569 AND, 1355 NOT, 550 OR)",
           "computeLatency": "324 cycles",
-          "computeLatencySub": "3.24 μs @ 100 MHz (9 cycles/pixel)",
+          "computeLatencySub": "3.24 μs @ 100 MHz ref (9 cycles/pixel)",
           "totalLatency": "325 cycles",
-          "totalLatencySub": "Preload: 0 cyc (streaming memory reads)",
+          "totalLatencySub": "Measured sim: 325 cyc | Preload: 0 cyc (streaming)",
           "density": "200.0 MOPS",
           "densitySub": "648 integer ops / frame (307,692 FPS)",
-          "desc": "Architecture A (Serial): 1 serial MAC unit accumulating 9 products sequentially over 9 clock cycles per pixel. Area-minimal footprint."
+          "desc": "Architecture A (Serial Baseline): Fixed-shape 1-multiplier MAC accumulating 9 products sequentially over 9 clock cycles per pixel. Area-minimal footprint."
         },
         "B": {
           "gates": "28,522 cells",
           "gatesSub": "Generic CMOS (7795 AND, 14926 NOT, 5217 OR)",
           "computeLatency": "36 cycles",
-          "computeLatencySub": "0.36 μs @ 100 MHz (1 cycle/pixel)",
+          "computeLatencySub": "0.36 μs @ 100 MHz ref (1 cycle/pixel)",
           "totalLatency": "110 cycles",
-          "totalLatencySub": "Preload: 73 cyc (64 img + 9 krn buffer load)",
+          "totalLatencySub": "Measured sim: 110 cyc (73 preload + 37 compute)",
           "density": "1,800.0 MOPS (1.80 GOPS)",
           "densitySub": "Peak streaming throughput: 2,777,778 FPS (909k with reload)",
-          "desc": "Architecture B (Parallel 9-MAC): 9 parallel multipliers + single-cycle combinational adder tree + ReLU. Emits 1 pixel/cycle (9.0x compute speedup)."
+          "desc": "Architecture B (Parallel 9-MAC): Fixed-shape 9 parallel multipliers + single-cycle combinational adder tree + ReLU. Emits 1 pixel/cycle (9.0x compute speedup)."
         }
       }
     };
@@ -488,7 +525,7 @@
         timingHtml = `<span style='color:var(--accent);'>Cycle ${cyc} (Single-cycle combinational parallel MAC + ReLU)</span>`;
         executionFlowHtml = `
           <strong>Parallel Spatial Multipliers:</strong> 9 concurrent 8-bit multipliers evaluate (P0..P8 × K0..K8) in parallel<br>
-          <strong>Single-Cycle Adder Tree:</strong> 3 stages of combinational adders sum all 9 products -> ReLU max(0, X) -> Output Register
+          <strong>Single-Cycle Adder Tree:</strong> 3 stages of combinational adders sum all 9 products -> ReLU max(0, X) [redundant for uint] -> Output Register
         `;
       }
 

@@ -56,16 +56,21 @@ def main():
     b_compute_spd_str = f"{comp['compute_speedup']}x Faster"
     b_total_spd_str = f"{comp['total_speedup_with_preload']}x Faster"
 
+    a_sim_cycles_str = f"{a['measured_sim_cycles']} cycles (sim) / {a['analytical_cycles']} (ana)"
+    b_sim_cycles_str = f"{b['measured_sim_cycles']} cycles (sim) / {b['analytical_cycles']} (ana)"
+
     print("\n==================================================================")
     print("             ARCHITECTURAL COMPARISON & PPA SUMMARY              ")
     print("==================================================================")
     print(f"{'Metric':<30} | {'Architecture A (Serial)':<24} | {'Architecture B (Parallel)':<24}")
     print("-" * 84)
+    print(f"{'Design Scope':<30} | {'Fixed 8x8 -> 6x6 output':<24} | {'Fixed 8x8 -> 6x6 output':<24}")
     print(f"{'MAC Units':<30} | {'1 Serial Multiplier':<24} | {'9 Spatial Multipliers':<24}")
     print(f"{'Adder Tree Architecture':<30} | {'Sequential Accumulator':<24} | {'Single-Cycle Combinational':<24}")
+    print(f"{'ReLU Activation':<30} | {'N/A':<24} | {'max(0,X) [Redundant for uint]':<24}")
     print(f"{'Buffer Preload Latency':<30} | {a_preload_str:<24} | {b_preload_str:<24}")
     print(f"{'Active Compute Latency':<30} | {a_compute_str:<24} | {b_compute_str:<24}")
-    print(f"{'Total Execution Latency':<30} | {a_total_str:<24} | {b_total_str:<24}")
+    print(f"{'Total Measured Cycles':<30} | {a_sim_cycles_str:<24} | {b_sim_cycles_str:<24}")
     print(f"{'Compute Speedup':<30} | {'1.00x (Baseline)':<24} | {b_compute_spd_str:<24}")
     print(f"{'Total Speedup (with Preload)':<30} | {'1.00x (Baseline)':<24} | {b_total_spd_str:<24}")
     print(f"{'Peak Compute Density':<30} | {a_mops_str:<24} | {b_mops_str:<24}")

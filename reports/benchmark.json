@@ -1,7 +1,10 @@
 {
-  "timestamp": "2026-11-09T12:20:00Z",
+  "timestamp": "2026-11-10T00:25:00Z",
+  "design_scope": "Fixed-shape 2D convolution: 8x8 input image, 3x3 kernel, 6x6 output feature map (36 pixels).",
   "reference_clock_mhz": 100.0,
-  "timing_disclaimer": "100 MHz is a nominal reference clock for cycle-time calculations, not an STA signed-off physical timing closure. Synthesis gate counts represent generic standard CMOS gates (cmos2 library: NOT, AND, OR) via Yosys 0.70 + ABC.",
+  "timing_disclaimer": "100 MHz (10 ns period) is an assumed nominal reference clock for cycle-to-time conversions, NOT a signed-off Static Timing Analysis (STA) timing closure. Synthesis gate counts represent generic standard CMOS logic cells (cmos2: NOT, AND, OR) via Yosys 0.70 + ABC.",
+  "routing_disclaimer": "Wire counts and wire bits represent internal Yosys RTLIL logical netlist nets, NOT physical layout routing tracks or parasitic interconnect metrics.",
+  "relu_redundancy_note": "For unsigned 8-bit inputs and weights ([0, 255]), all products and sums are strictly non-negative (>= 0). Thus, ReLU(X) = max(0, X) == X is mathematically redundant for this unsigned datapath and serves as an architectural placeholder for signed extensions.",
   "operations_per_frame": 648,
   "architectures": {
     "serial_baseline": {
@@ -10,10 +13,16 @@
       "gate_count": 2474,
       "wires": 3882,
       "wire_bits": 4115,
-      "cell_breakdown": {},
+      "cell_breakdown": {
+        "$and": 569,
+        "$not": 1355,
+        "$or": 550
+      },
       "preload_cycles": 0,
       "compute_cycles": 324,
       "total_cycles": 325,
+      "measured_sim_cycles": 325,
+      "analytical_cycles": 325,
       "compute_latency_us": 3.24,
       "total_latency_us": 3.25,
       "compute_fps": 308642,
@@ -21,18 +30,25 @@
       "compute_mops": 200.0,
       "total_mops": 199.4,
       "adder_tree_type": "None (Sequential accumulator register)",
-      "verification_status": "36/36 BIT-EXACT PASS"
+      "verification_status": "36/36 BIT-EXACT PASS (5/5 suites)"
     },
     "parallel_9mac": {
-      "name": "Architecture B (Parallel 9-MAC + ReLU)",
+      "name": "Architecture B (Parallel 9-MAC + Combinational Tree)",
       "module": "cnn_accel_parallel",
       "gate_count": 28522,
       "wires": 43694,
       "wire_bits": 46085,
-      "cell_breakdown": {},
+      "cell_breakdown": {
+        "$and": 7795,
+        "$logic_not": 584,
+        "$not": 14926,
+        "$or": 5217
+      },
       "preload_cycles": 73,
       "compute_cycles": 36,
       "total_cycles": 110,
+      "measured_sim_cycles": 110,
+      "analytical_cycles": 110,
       "compute_latency_us": 0.36,
       "total_latency_us": 1.1,
       "compute_fps": 2777778,
@@ -40,7 +56,7 @@
       "compute_mops": 1800.0,
       "total_mops": 589.1,
       "adder_tree_type": "Single-Cycle Combinational Adder Tree (Non-pipelined, 3 stages logic)",
-      "verification_status": "36/36 BIT-EXACT PASS"
+      "verification_status": "36/36 BIT-EXACT PASS (5/5 suites)"
     }
   },
   "comparisons": {

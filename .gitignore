@@ -8,8 +8,10 @@ env/
 # Simulation binaries
 sim/cnn_sim
 sim/cnn_sim_parallel
+sim/cnn_cand_sim
 *.out
 *.exe
+*.vcd
 
 # Waveforms (optional: keep if small or ignore)
 *.log
