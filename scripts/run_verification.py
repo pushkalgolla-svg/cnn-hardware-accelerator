@@ -240,9 +240,9 @@ def run_full_suite() -> bool:
     print("==============================================================")
 
     if overall_pass:
-        print(">>> VERIFICATION RESULT: [ ALL 10 REGRESSIONS PASSED ] <<<")
+        print(f">>> VERIFICATION RESULT: [ ALL {len(results_summary)} REGRESSIONS PASSED ] <<<")
         print(">>> Both architectures verified 100% bit-exact across normal,")
-        print(">>> zero, max-range saturation, checkerboard, and impulse tests!")
+        print(">>> zero, max-range saturation, checkerboard, impulse, and random seeds!")
     else:
         print(">>> VERIFICATION RESULT: [ FAILED ] <<<")
 

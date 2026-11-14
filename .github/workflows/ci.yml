@@ -45,6 +45,10 @@ jobs:
         run: |
           python3 scripts/synth_benchmark.py
 
+      - name: Audit Static Timing Analysis & Logic Depth
+        run: |
+          python3 scripts/run_sta.py
+
       - name: Validate Synthesis Benchmark Report & PPA Metrics
         run: |
           python3 scripts/validate_benchmark.py

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-11-10T00:25:00Z",
+  "timestamp": "2026-11-14T11:00:00Z",
   "design_scope": "Fixed-shape 2D convolution: 8x8 input image, 3x3 kernel, 6x6 output feature map (36 pixels).",
   "reference_clock_mhz": 100.0,
   "timing_disclaimer": "100 MHz (10 ns period) is an assumed nominal reference clock for cycle-to-time conversions, NOT a signed-off Static Timing Analysis (STA) timing closure. Synthesis gate counts represent generic standard CMOS logic cells (cmos2: NOT, AND, OR) via Yosys 0.70 + ABC.",
@@ -7,10 +7,51 @@
   "routing_disclaimer": "Wire counts and wire bits represent internal Yosys RTLIL logical netlist nets, NOT physical layout routing tracks or parasitic interconnect metrics.",
   "relu_redundancy_note": "For unsigned 8-bit inputs and weights ([0, 255]), all products and sums are strictly non-negative (>= 0). Thus, ReLU(X) = max(0, X) == X is mathematically redundant for this unsigned datapath and serves as an architectural placeholder for signed extensions.",
   "operations_per_frame": 648,
+  "timing_analysis": {
+    "status": "TECHNOLOGY_INDEPENDENT_AUDIT",
+    "opensta_available": false,
+    "reference_clock_mhz": 100.0,
+    "nominal_period_ns": 10.0,
+    "timing_closure_disclaimer": "100.0 MHz (10.0 ns period) is an assumed nominal reference clock for cycle-to-time conversion, NOT a signed-off physical Static Timing Analysis (STA) timing closure. Technology-independent logic depth quantifies gate levels and arithmetic carry chains, but true physical delay requires standard cell transistor models (Liberty .lib), PVT corner derating, clock tree synthesis, and post-routing RC extraction (SPEF).",
+    "architectures": {
+      "serial_baseline": {
+        "name": "Architecture A (Serial Baseline)",
+        "critical_path_description": "Register output (kr_r/kc_r/acc_r) -> 2D address generation -> 8x8-bit unsigned multiplier (img_data * kernel_data) -> 24-bit sequential accumulator adder -> acc_r / out_data DFF input",
+        "multiplier_stages": 1,
+        "adder_tree_stages": 0,
+        "carry_chain_depth_bits": 24,
+        "estimated_combinational_gate_levels": 35,
+        "longest_path_component": "24-bit accumulator adder carry propagation",
+        "timing_criticality": "Low - Single MAC unit with short combinational feedback path"
+      },
+      "parallel_9mac": {
+        "name": "Architecture B (Parallel 9-MAC)",
+        "critical_path_description": "Register output (img_buf/kernel_buf) -> 9 parallel 8x8-bit unsigned multipliers -> 3-stage combinational adder tree (Stage 1: 16b+16b->17b; Stage 2: 17b+17b->18b; Stage 3: 18b+18b->19b, +18b->20b) -> ReLU zero extension -> out_data DFF input",
+        "multiplier_stages": 1,
+        "adder_tree_stages": 3,
+        "carry_chain_depth_bits": 71,
+        "estimated_combinational_gate_levels": 68,
+        "longest_path_component": "3-stage combinational adder tree summation across 9 parallel products",
+        "timing_criticality": "High - The non-pipelined 3-stage adder tree forms the primary frequency bottleneck. At 100 MHz reference clock, combinational propagation must complete within 10.0 ns. In physical deep-submicron implementation, pipelining the adder tree with 1-2 register stages would improve maximum attainable Fmax at the expense of 1-2 cycles initial latency."
+      }
+    },
+    "opensta_workflow": {
+      "sdc_constraints_file": "constraints/cnn_accel.sdc",
+      "tcl_script_file": "scripts/run_opensta.tcl",
+      "execution_command": "sta scripts/run_opensta.tcl",
+      "example_pdk_target": "SkyWater 130nm (sky130_fd_sc_hd__tt_025C_1v80.lib) or FreePDK45"
+    }
+  },
   "architectures": {
     "serial_baseline": {
       "name": "Architecture A (Serial Baseline)",
       "module": "cnn_accel",
+      "combinational_cells": 2474,
+      "sequential_cells": 62,
+      "total_cells": 2536,
+      "buffer_storage_dffs": 0,
+      "datapath_control_dffs": 62,
+      "memory_implementation": "Streaming on-the-fly address generation (Zero internal buffer storage registers).",
       "gate_count": 2474,
       "wires": 3882,
       "wire_bits": 4115,
@@ -31,11 +72,19 @@
       "compute_mops": 200.0,
       "total_mops": 198.8,
       "adder_tree_type": "None (Sequential accumulator register)",
-      "verification_status": "36/36 BIT-EXACT PASS (5/5 suites)"
+      "critical_path_stages": "1 Multiplier + 1 Accumulator Adder (~35 gate levels)",
+      "verification_status": "36/36 BIT-EXACT PASS (8/8 suites, 16 regressions)"
     },
     "parallel_9mac": {
       "name": "Architecture B (Parallel 9-MAC + Combinational Tree)",
       "module": "cnn_accel_parallel",
+      "combinational_cells": 28522,
+      "sequential_cells": 614,
+      "total_cells": 29136,
+      "buffer_storage_dffs": 584,
+      "datapath_control_dffs": 30,
+      "storage_overhead_percent": 95.1,
+      "memory_implementation": "Multi-Port Register Array (584 DFFs: 512 img + 72 krn). Concurrent 9-pixel and 9-weight spatial reads per cycle preclude standard 1R/1W SRAM macro blocks.",
       "gate_count": 28522,
       "wires": 43694,
       "wire_bits": 46085,
@@ -58,13 +107,17 @@
       "compute_mops": 1800.0,
       "total_mops": 583.8,
       "adder_tree_type": "Single-Cycle Combinational Adder Tree (Non-pipelined, 3 stages logic)",
-      "verification_status": "36/36 BIT-EXACT PASS (5/5 suites)"
+      "critical_path_stages": "1 Multiplier + 3-Stage Combinational Adder Tree (~68 gate levels)",
+      "verification_status": "36/36 BIT-EXACT PASS (8/8 suites, 16 regressions)"
     }
   },
   "comparisons": {
     "compute_speedup": 9.0,
     "active_frame_speedup": 8.58,
     "total_speedup_with_preload": 2.94,
+    "combinational_ratio": 11.53,
+    "sequential_ratio": 9.9,
+    "total_cell_ratio": 11.49,
     "gate_ratio": 11.53,
     "area_ratio": 11.53
   }

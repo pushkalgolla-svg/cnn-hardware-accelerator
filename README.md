@@ -2,8 +2,8 @@
 
 [![Verilog-2001](https://img.shields.io/badge/Verilog-2001-blue.svg)](https://en.wikipedia.org/wiki/Verilog)
 [![Simulator](https://img.shields.io/badge/Simulator-Icarus_Verilog_12.0-green.svg)](https://steveicarus.github.io/iverilog/)
-[![Synthesis](https://img.shields.io/badge/Synthesis-Yosys_0.70_+_ABC-orange.svg)](https://yosyshq.net/yosys/)
-[![Regression](https://img.shields.io/badge/Regression-10%2F10_Bit--Exact_Pass-brightgreen.svg)]()
+[![Synthesis](https://img.shields.io/badge/Synthesis-Yosys_0.71_+_ABC-orange.svg)](https://yosyshq.net/yosys/)
+[![Regression](https://img.shields.io/badge/Regression-16%2F16_Bit--Exact_Pass-brightgreen.svg)]()
 [![Live Demo](https://img.shields.io/badge/Live_Dashboard-cnn--hardware--accelerator.vercel.app-000000?style=flat&logo=vercel&logoColor=white)](https://cnn-hardware-accelerator.vercel.app)
 
 > 🌐 **Interactive Dashboard & Exploration**: [https://cnn-hardware-accelerator.vercel.app](https://cnn-hardware-accelerator.vercel.app)  
@@ -43,19 +43,24 @@ All synthesis metrics are extracted reproducibly under identical Yosys + ABC set
 | :--- | :--- | :--- | :--- |
 | **Arithmetic Units** | 1 Serial Multiplier + Acc | **9 Parallel Multipliers + Adder Tree** | $9.0\times$ Datapath Parallelism |
 | **Adder Tree Microarchitecture** | Sequential Accumulator | **Single-Cycle Combinational Tree** | Non-pipelined (3 stages logic) |
+| **Critical Path Depth** | 1 Mult + 1 Acc (~35 gate levels) | **1 Mult + 3 Adders (~68 gate levels)** | Adder tree is frequency bottleneck |
 | **Buffer Preload Cycles** | **0 cycles** (Streaming memory reads) | **73 cycles** (64 image + 9 kernel) | Preload required for parallel array |
 | **Pure Arithmetic Cycles**| **324 cycles** (9 cycles / pixel) | **36 cycles** (1 cycle / pixel) | **$9.00\times$ Arithmetic Speedup** |
+| **Active Compute Phase** | **324 cycles** | **38 cycles** (1 start + 36 comp + 1 done) | **$8.53\times$ Active Phase Speedup** |
 | **Total Measured Cycles**| **326 cycles** (Icarus simulation) | **111 cycles** (73 load + 38 compute) | **$2.94\times$ Total Speedup** |
 | **Compute Latency (@ 100 MHz\*)** | $3.24\,\mu\text{s}$ | **$0.36\,\mu\text{s}$** | $9.00\times$ Latency Reduction |
 | **Total Latency (@ 100 MHz\*)** | $3.26\,\mu\text{s}$ | **$1.11\,\mu\text{s}$** | $2.94\times$ Latency Reduction |
 | **Inference Throughput (Compute)** | $308,642$ frames/sec | **$2,777,778$ frames/sec** | $9.00\times$ Higher Throughput |
 | **Inference Throughput (Total)** | $306,748$ frames/sec | **$900,901$ frames/sec** | $2.94\times$ Higher Throughput |
 | **Peak Arithmetic Density** | $200.0$ MOPS | **$1,800.0$ MOPS ($1.80$ GOPS)** | $9.00\times$ Compute Density |
-| **Standard Cell Gates (Yosys)\*\*** | **2,474 gates** | **28,522 gates** | $11.53\times$ Logic Gate Scaling |
+| **Combinational Gates (Yosys)\*\*** | **2,474 gates** | **28,522 gates** | $11.53\times$ Combinational Scaling |
+| **Sequential Storage (DFFs)** | **62 flip-flops** (0 buffer) | **614 flip-flops** (584 buffer DFFs) | $9.90\times$ Sequential Scaling (95.1% buffer) |
+| **Total Generic Cells** | **2,536 cells** | **29,136 cells** | $11.49\times$ Total Mapped Cells |
+| **Memory Implementation** | Streaming on-the-fly | Multi-port register array (584 DFFs) | 9 concurrent reads preclude SRAM |
 | **Logical Nets (RTLIL Wires)\*\*\***| $3,882$ wires | $43,694$ wires | $11.26\times$ Logical Net Count |
 | **Logical Wire Bits\*\*\*** | $4,115$ wire bits | $46,085$ wire bits | $11.20\times$ Net Bit Complexity |
-| **Gate Breakdown** | $569$ AND, $1,355$ NOT, $550$ OR | $7,795$ AND, $584$ LOGIC\_NOT, $14,926$ NOT, $5,217$ OR | Optimized via ABC technology mapping |
-| **Multi-Vector Regression** | **100% Bit-Exact PASS (5 suites)** | **100% Bit-Exact PASS (5 suites)** | Verified against Python reference |
+| **Gate Breakdown (ABC)** | $569$ AND, $1,355$ NOT, $550$ OR | $7,795$ AND, $584$ LOGIC\_NOT, $14,926$ NOT, $5,217$ OR | Optimized generic CMOS gates |
+| **Multi-Vector Regression** | **100% Bit-Exact PASS (8 suites)** | **100% Bit-Exact PASS (8 suites)** | 16/16 regressions bit-exact |
 
 *\*Note on STA: 100 MHz is an assumed nominal reference clock for architectural cycle-time conversion ($10\,\text{ns}$ period), not a signed-off physical Static Timing Analysis (STA) timing closure, which requires foundry-specific standard cell PDKs, sign-off STA tools (e.g., OpenSTA), and parasitic extraction.*  
 *\*\*Note on Gates: Standard cell counts represent generic Boolean logic gates (`cmos2`: NOT, AND, OR) mapped via Yosys + ABC. These quantify relative logical gate complexity, NOT physical silicon layout area ($\mu\text{m}^2/\text{mm}^2$), which requires physical P&R with foundry-specific standard cell geometries.*  
@@ -84,15 +89,37 @@ Cycle accounting is rigorously measured in cycle-accurate Icarus Verilog simulat
 
 ## 🧪 Comprehensive Multi-Vector Verification Suite
 
-The verification environment strictly drives testbench inputs on `negedge clk` to eliminate all sampling race hazards, and validates against an independent Python golden reference model across 5 distinct stimulus suites:
+The verification environment strictly drives testbench inputs on `negedge clk` to eliminate all sampling race hazards, and validates against an independent Python golden reference model across 8 distinct stimulus suites (16 total regressions):
 
 1. **Random (`random`)**: Deterministic pseudo-random distribution (seed 42).
 2. **Boundary Minimum (`all_zeros`)**: All image pixels = 0, all weights = 0 $\to$ Output = all 0.
 3. **Boundary Maximum (`all_max`)**: All image pixels = 255, all weights = 255 $\to$ Output = all $585,225$ (`0x08EE09`). Tests 24-bit accumulator dynamic range without saturation or overflow.
 4. **High-Frequency Pattern (`checkerboard`)**: Alternating `0xAA` ($170$) and `0x55` ($85$).
 5. **Impulse Response (`impulse`)**: Single non-zero center pixel ($128$) and center weight ($64$).
-6. **Hardware Buffer Protection**: Actively attempts write to `img_buf` during `COMPUTE`; verifies that writes are blocked and outputs remain bit-exact.
-7. **Restart & Mid-Computation Reset**: Verifies clean abort and recovery on synchronous reset mid-computation, and back-to-back start without hardware reset.
+6. **Stress Distribution 1 (`random_seed100`)**: Pseudo-random distribution with wide dynamic range.
+7. **Stress Distribution 2 (`random_seed2024`)**: High-entropy pseudo-random pattern.
+8. **Stress Distribution 3 (`random_seed9999`)**: High-variance pseudo-random distribution.
+9. **Hardware Buffer Write Protection**: Actively attempts write to `img_buf` during `COMPUTE`; verifies that writes are blocked and outputs remain bit-exact.
+10. **Array Bound Validation**: Attempts invalid kernel writes (`kernel_wr_addr = 13`); verifies out-of-bounds addresses are discarded.
+11. **Restart Verification**: Verifies clean consecutive frame execution without hardware reset.
+12. **Mid-Computation Fault Recovery**: Asserts synchronous reset mid-computation; verifies immediate clean abort to `IDLE` (`out_valid=0`, `done=0`) and 100% bit-exact recovery on subsequent frame.
+
+---
+
+## ⏱️ Timing Analysis & OpenSTA Workflow
+
+The repository includes a complete Synopsys Design Constraints (SDC) and OpenSTA workflow for physical static timing analysis:
+
+- **SDC Constraints**: `constraints/cnn_accel.sdc`
+  - 100.0 MHz nominal reference clock (`clk` period 10.0 ns, 50% duty cycle)
+  - 200 ps clock uncertainty margin
+  - 2.0 ns I/O boundary delay budgets
+- **OpenSTA Script**: `scripts/run_opensta.tcl`
+  - Parameterized for any commercial or open-source standard cell library (e.g., SkyWater 130nm `sky130_fd_sc_hd__tt_025C_1v80.lib` or Nangate 45nm).
+- **Technology-Independent Critical Path & Logic Depth Audit**:
+  - `python scripts/run_sta.py`
+  - **Architecture A**: 1 multiplier + 1 accumulator adder (~35 gate levels).
+  - **Architecture B**: 1 multiplier + 3-stage combinational adder tree (~68 gate levels, 71-bit carry chain depth). The non-pipelined combinational tree is the primary clock frequency bottleneck.
 
 ---
 
@@ -107,12 +134,17 @@ cnn_accelerator/
 │   ├── cnn_accel_parallel_synth.v # Architecture B: Synthesized CMOS gate netlist
 │   └── candidates/                # Isolated directory for AI-generated candidates
 ├── tb/
-│   ├── tb_cnn.v                   # Race-free testbench for Architecture A
-│   └── tb_cnn_parallel.v          # Race-free testbench for Architecture B
+│   ├── tb_cnn.v                   # Race-free testbench for Architecture A (326 cycles)
+│   └── tb_cnn_parallel.v          # Race-free testbench for Architecture B (111 cycles)
+├── constraints/
+│   └── cnn_accel.sdc              # Synopsys Design Constraints (100 MHz reference clock)
 ├── scripts/
-│   ├── golden_model.py            # Independent Python golden reference model
-│   ├── run_verification.py        # Offline multi-vector regression suite
+│   ├── golden_model.py            # Independent Python golden model (8 test suites)
+│   ├── run_verification.py        # Offline multi-vector regression suite (16 regressions)
 │   ├── synth_benchmark.py         # Yosys synthesis & PPA benchmark runner
+│   ├── run_sta.py                 # Static timing analysis & logic depth auditor
+│   ├── run_opensta.tcl            # OpenSTA timing script for standard cell libraries
+│   ├── validate_benchmark.py      # Benchmark JSON report validator
 │   ├── compare_architectures.py   # Dual-architecture comparison runner
 │   └── orchestrator.py            # AI hardware architect & verification orchestrator
 ├── data/
@@ -122,13 +154,13 @@ cnn_accelerator/
 │   ├── hw_output.hex              # Hardware output from Architecture A
 │   └── hw_output_parallel.hex     # Hardware output from Architecture B
 ├── reports/
-│   ├── benchmark.json             # Machine-readable PPA and verification results
+│   ├── benchmark.json             # Machine-readable PPA, verification, & timing results
 │   ├── synthesis_and_ppa_report.md# Detailed synthesis benchmark report
 │   └── architecture_tradeoff_study.md # Architectural trade-off analysis
 ├── dashboard/
 │   └── index.html                 # Interactive visual animated 2D convolution GUI
 ├── .github/workflows/
-│   └── ci.yml                     # GitHub Actions CI for linting and simulation
+│   └── ci.yml                     # GitHub Actions CI for linting, simulation, & synthesis
 └── README.md
 ```
 

@@ -114,6 +114,39 @@ def generate_test_vectors() -> Dict[str, Dict[str, Any]]:
         "expected": conv2d_reference(img_impulse, krn_impulse),
     }
 
+    # 6. Deterministic Random Suite 2 (seed 100) - Diverse dynamic range
+    rng100 = random.Random(100)
+    img_r100 = [[rng100.randint(0, 255) for _ in range(8)] for _ in range(8)]
+    krn_r100 = [[rng100.randint(0, 255) for _ in range(3)] for _ in range(3)]
+    vectors["random_seed100"] = {
+        "description": "Deterministic pseudo-random distribution (seed 100)",
+        "image": img_r100,
+        "kernel": krn_r100,
+        "expected": conv2d_reference(img_r100, krn_r100),
+    }
+
+    # 7. Deterministic Random Suite 3 (seed 2024) - High-entropy distribution
+    rng2024 = random.Random(2024)
+    img_r2024 = [[rng2024.randint(0, 255) for _ in range(8)] for _ in range(8)]
+    krn_r2024 = [[rng2024.randint(0, 255) for _ in range(3)] for _ in range(3)]
+    vectors["random_seed2024"] = {
+        "description": "Deterministic pseudo-random distribution (seed 2024)",
+        "image": img_r2024,
+        "kernel": krn_r2024,
+        "expected": conv2d_reference(img_r2024, krn_r2024),
+    }
+
+    # 8. Deterministic Random Suite 4 (seed 9999) - Stress-test distribution
+    rng9999 = random.Random(9999)
+    img_r9999 = [[rng9999.randint(0, 255) for _ in range(8)] for _ in range(8)]
+    krn_r9999 = [[rng9999.randint(0, 255) for _ in range(3)] for _ in range(3)]
+    vectors["random_seed9999"] = {
+        "description": "Deterministic pseudo-random distribution (seed 9999)",
+        "image": img_r9999,
+        "kernel": krn_r9999,
+        "expected": conv2d_reference(img_r9999, krn_r9999),
+    }
+
     return vectors
 
 

@@ -178,9 +178,9 @@
 
   <div class="grid-stats">
     <div class="stat-card">
-      <div class="stat-label">Yosys Standard Cell Gates</div>
-      <div class="stat-val" id="stat-gates">2,474 cells</div>
-      <div class="stat-sub" id="stat-gates-sub">Generic CMOS (569 AND, 1355 NOT, 550 OR)</div>
+      <div class="stat-label">Combinational Logic Gates</div>
+      <div class="stat-val" id="stat-gates">2,474 gates</div>
+      <div class="stat-sub" id="stat-gates-sub">Generic CMOS (569 AND, 1355 NOT, 550 OR) | Sequential: 62 DFFs</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Active Compute Latency</div>
@@ -189,8 +189,8 @@
     </div>
     <div class="stat-card">
       <div class="stat-label">Total Execution Latency</div>
-      <div class="stat-val" id="stat-total-lat">325 cycles</div>
-      <div class="stat-sub" id="stat-total-lat-sub">Measured sim: 325 cyc | Preload: 0 cyc (streaming)</div>
+      <div class="stat-val" id="stat-total-lat">326 cycles</div>
+      <div class="stat-sub" id="stat-total-lat-sub">Measured sim: 326 cyc | Preload: 0 cyc (streaming)</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Peak Arithmetic Density</div>
@@ -316,10 +316,34 @@
             <td style="color:var(--success); font-weight:700;">9.00x MOPS</td>
           </tr>
           <tr>
-            <td><strong>Standard Cell Gates (Yosys)</strong></td>
+            <td><strong>Combinational Logic Gates</strong></td>
             <td><strong>2,474 gates</strong></td>
             <td>28,522 gates</td>
-            <td style="color:var(--warning);">11.53x Logic Gate Scaling</td>
+            <td style="color:var(--warning);">11.53x Combinational Scaling</td>
+          </tr>
+          <tr>
+            <td><strong>Sequential Storage (DFFs)</strong></td>
+            <td><strong>62 flip-flops</strong> (0 buffer)</td>
+            <td>614 flip-flops (584 buffer)</td>
+            <td style="color:var(--warning);">9.90x Sequential Scaling (95.1% buffer)</td>
+          </tr>
+          <tr>
+            <td><strong>Total Generic Cells</strong></td>
+            <td><strong>2,536 cells</strong></td>
+            <td>29,136 cells</td>
+            <td style="color:var(--warning);">11.49x Total Cell Scaling</td>
+          </tr>
+          <tr>
+            <td><strong>Memory Implementation</strong></td>
+            <td>Streaming reads (0 buffer DFFs)</td>
+            <td>Multi-port register array (584 DFFs)</td>
+            <td>9-way concurrent read precludes SRAM</td>
+          </tr>
+          <tr>
+            <td><strong>Critical Path Topology</strong></td>
+            <td>1 Mult + 1 Acc (~35 gate levels)</td>
+            <td>1 Mult + 3 Adders (~68 gate levels)</td>
+            <td>Adder tree is timing bottleneck</td>
           </tr>
           <tr>
             <td><strong>Cell Breakdown (ABC)</strong></td>
@@ -335,8 +359,8 @@
           </tr>
           <tr>
             <td><strong>Multi-Vector Verification</strong></td>
-            <td style="color:var(--success); font-weight:600;">PASS (5 suites)</td>
-            <td style="color:var(--success); font-weight:600;">PASS (5 suites)</td>
+            <td style="color:var(--success); font-weight:600;">PASS (8 suites, 16 regressions)</td>
+            <td style="color:var(--success); font-weight:600;">PASS (8 suites, 16 regressions)</td>
             <td>100% Bit-Exact Match</td>
           </tr>
         </tbody>
@@ -346,7 +370,7 @@
 
   <div class="verification-card">
     <h2>Verified Multi-Vector Regression Suite</h2>
-    <p style="color: var(--text-muted); font-size: 0.82rem;">Both architectures independently verified bit-exact against Python reference model in Icarus Verilog across normal and boundary conditions:</p>
+    <p style="color: var(--text-muted); font-size: 0.82rem;">Both architectures independently verified bit-exact against Python reference model in Icarus Verilog across normal, boundary, and multi-seed conditions:</p>
     <div class="verif-grid">
       <div class="verif-item">
         <span><strong>1. Normal Random:</strong> Pseudo-random 8-bit (seed 42)</span>
@@ -369,8 +393,24 @@
         <span class="verif-tag">[PASS: 36/36 EXACT]</span>
       </div>
       <div class="verif-item">
-        <span><strong>6. Hardware Protection:</strong> Buffer Write Guard in Compute</span>
+        <span><strong>6. Seed 100 Random:</strong> Dynamic range stress distribution</span>
+        <span class="verif-tag">[PASS: 36/36 EXACT]</span>
+      </div>
+      <div class="verif-item">
+        <span><strong>7. Seed 2024 Random:</strong> High-entropy distribution</span>
+        <span class="verif-tag">[PASS: 36/36 EXACT]</span>
+      </div>
+      <div class="verif-item">
+        <span><strong>8. Seed 9999 Random:</strong> Extreme variance distribution</span>
+        <span class="verif-tag">[PASS: 36/36 EXACT]</span>
+      </div>
+      <div class="verif-item">
+        <span><strong>9. Hardware Protection:</strong> Buffer Write Guard in Compute</span>
         <span class="verif-tag">[PASS: BLOCKED]</span>
+      </div>
+      <div class="verif-item">
+        <span><strong>10. Fault Recovery:</strong> Mid-Compute Synchronous Reset & Restart</span>
+        <span class="verif-tag">[PASS: RECOVERED]</span>
       </div>
     </div>
   </div>
@@ -378,9 +418,9 @@
   <div class="resume-section">
     <h2>Resume Bullet Points (ASIC / FPGA RTL Engineering)</h2>
     <ul class="resume-list">
-      <li><strong>AI Hardware Acceleration & Microarchitecture:</strong> Architected, synthesized, and verified two fixed-shape ($8\times 8$ image, $3\times 3$ kernel, $6\times 6$ output) 2D CNN Hardware Accelerators in Verilog-2001—a compact serial MAC architecture (2,474 gates) and a high-throughput 9-MAC parallel architecture (28,522 gates, single-cycle combinational adder tree, ReLU activation)—achieving a <strong>9.00x compute latency reduction (36 cycles, 1.80 GOPS)</strong>.</li>
-      <li><strong>Comprehensive Verification Methodology:</strong> Built an automated offline regression test suite comparing cycle-accurate Icarus Verilog simulations against an independent Python golden reference model, achieving 100% bit-exact validation across 5 suites including boundary conditions (all zeros, max 24-bit range 585,225 saturation), restart tests, and hardware buffer write-protection verification.</li>
-      <li><strong>ASIC Gate-Level Synthesis & PPA Analysis:</strong> Executed standard cell synthesis using Yosys 0.70 and ABC, mapping RTL designs to generic CMOS logic gates to quantify logic gate complexity vs. throughput trade-offs (2,474 vs 28,522 generic cells; not physical silicon area) and separating buffer preload cycles from active computation.</li>
+      <li><strong>AI Hardware Acceleration & Microarchitecture:</strong> Architected, synthesized, and verified two fixed-shape ($8\times 8$ image, $3\times 3$ kernel, $6\times 6$ output) 2D CNN Hardware Accelerators in Verilog-2001—a compact serial MAC architecture (2,474 combinational gates, 62 DFFs) and a high-throughput 9-MAC parallel architecture (28,522 combinational gates, 614 DFFs, single-cycle combinational adder tree, ReLU activation)—achieving a <strong>9.00x compute latency reduction (36 cycles, 1.80 GOPS)</strong>.</li>
+      <li><strong>Comprehensive Verification Methodology:</strong> Built an automated offline regression test suite comparing cycle-accurate Icarus Verilog simulations against an independent Python golden reference model, achieving 100% bit-exact validation across 8 suites (16 regressions) including boundary conditions (all zeros, max 24-bit range 585,225 saturation), restart tests, and hardware buffer write-protection verification.</li>
+      <li><strong>ASIC Gate-Level Synthesis & PPA Analysis:</strong> Executed standard cell synthesis using Yosys 0.71 and ABC, mapping RTL designs to generic CMOS logic gates, distinguishing combinational gates from sequential flip-flops (quantifying 584 buffer storage DFFs = 95.1% of sequential state in the parallel design), and developing an OpenSTA SDC timing constraint flow.</li>
     </ul>
   </div>
 
@@ -388,26 +428,26 @@
     const benchmarkData = {
       "architectures": {
         "A": {
-          "gates": "2,474 cells",
-          "gatesSub": "Generic CMOS (569 AND, 1355 NOT, 550 OR)",
+          "gates": "2,474 gates",
+          "gatesSub": "Generic CMOS (569 AND, 1355 NOT, 550 OR) | Sequential: 62 DFFs",
           "computeLatency": "324 cycles",
           "computeLatencySub": "3.24 μs @ 100 MHz ref (9 cycles/pixel)",
           "totalLatency": "326 cycles",
           "totalLatencySub": "Measured sim: 326 cyc | Preload: 0 cyc (streaming)",
           "density": "200.0 MOPS",
           "densitySub": "648 integer ops / frame (306,748 FPS)",
-          "desc": "Architecture A (Serial Baseline): Fixed-shape 1-multiplier MAC accumulating 9 products sequentially over 9 clock cycles per pixel. Area-minimal footprint (2,474 generic gates)."
+          "desc": "Architecture A (Serial Baseline): Fixed-shape 1-multiplier MAC accumulating 9 products sequentially over 9 clock cycles per pixel. Area-minimal footprint (2,474 combinational gates, 62 DFFs)."
         },
         "B": {
-          "gates": "28,522 cells",
-          "gatesSub": "Generic CMOS (7795 AND, 14926 NOT, 5217 OR)",
+          "gates": "28,522 gates",
+          "gatesSub": "Generic CMOS (7795 AND, 14926 NOT, 5217 OR) | Sequential: 614 DFFs (584 buffer)",
           "computeLatency": "36 cycles",
           "computeLatencySub": "0.36 μs @ 100 MHz ref (1 cycle/pixel)",
           "totalLatency": "111 cycles",
           "totalLatencySub": "Measured sim: 111 cyc (73 preload + 38 compute)",
           "density": "1,800.0 MOPS (1.80 GOPS)",
           "densitySub": "Peak streaming throughput: 2,777,778 FPS (900,901 with reload)",
-          "desc": "Architecture B (Parallel 9-MAC): Fixed-shape 9 parallel multipliers + single-cycle combinational adder tree + ReLU. Emits 1 pixel/cycle (9.0x compute speedup)."
+          "desc": "Architecture B (Parallel 9-MAC): Fixed-shape 9 parallel multipliers + single-cycle combinational adder tree + ReLU. Emits 1 pixel/cycle (9.0x compute speedup, 28,522 gates, 614 DFFs)."
         }
       }
     };

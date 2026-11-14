@@ -51,13 +51,17 @@ def main():
     b_total_str = f"{b['total_cycles']} cycles"
     a_mops_str = f"{a['compute_mops']} MOPS"
     b_mops_str = f"{b['compute_mops']} MOPS ({b['compute_mops']/1000.0:.2f} GOPS)"
-    a_gates_str = f"{a['gate_count']:,} gates"
-    b_gates_str = f"{b['gate_count']:,} gates ({comp['area_ratio']}x)"
+    a_comb_str = f"{a['combinational_cells']:,} gates"
+    b_comb_str = f"{b['combinational_cells']:,} gates ({comp['combinational_ratio']}x)"
+    a_seq_str = f"{a['sequential_cells']} DFFs (0 buffer)"
+    b_seq_str = f"{b['sequential_cells']} DFFs ({b['buffer_storage_dffs']} buffer, {b['storage_overhead_percent']}%)"
+    a_tot_str = f"{a['total_cells']:,} cells"
+    b_tot_str = f"{b['total_cells']:,} cells ({comp['total_cell_ratio']}x)"
     b_compute_spd_str = f"{comp['compute_speedup']}x Faster"
     b_total_spd_str = f"{comp['total_speedup_with_preload']}x Faster"
 
-    a_sim_cycles_str = f"{a['measured_sim_cycles']} cycles (sim) / {a['analytical_cycles']} (ana)"
-    b_sim_cycles_str = f"{b['measured_sim_cycles']} cycles (sim) / {b['analytical_cycles']} (ana)"
+    a_sim_cycles_str = f"{a['measured_sim_cycles']} cyc (sim) / {a['analytical_cycles']} (ana)"
+    b_sim_cycles_str = f"{b['measured_sim_cycles']} cyc (sim) / {b['analytical_cycles']} (ana)"
 
     print("\n==================================================================")
     print("             ARCHITECTURAL COMPARISON & PPA SUMMARY              ")
@@ -67,6 +71,7 @@ def main():
     print(f"{'Design Scope':<30} | {'Fixed 8x8 -> 6x6 output':<24} | {'Fixed 8x8 -> 6x6 output':<24}")
     print(f"{'MAC Units':<30} | {'1 Serial Multiplier':<24} | {'9 Spatial Multipliers':<24}")
     print(f"{'Adder Tree Architecture':<30} | {'Sequential Accumulator':<24} | {'Single-Cycle Combinational':<24}")
+    print(f"{'Critical Path Delay':<30} | {'1 Mult + 1 Acc (~35 lvl)':<24} | {'1 Mult + 3 Adders (~68 lvl)':<24}")
     print(f"{'ReLU Activation':<30} | {'N/A':<24} | {'max(0,X) [Redundant for uint]':<24}")
     print(f"{'Buffer Preload Latency':<30} | {a_preload_str:<24} | {b_preload_str:<24}")
     print(f"{'Active Compute Latency':<30} | {a_compute_str:<24} | {b_compute_str:<24}")
@@ -74,7 +79,9 @@ def main():
     print(f"{'Compute Speedup':<30} | {'1.00x (Baseline)':<24} | {b_compute_spd_str:<24}")
     print(f"{'Total Speedup (with Preload)':<30} | {'1.00x (Baseline)':<24} | {b_total_spd_str:<24}")
     print(f"{'Peak Compute Density':<30} | {a_mops_str:<24} | {b_mops_str:<24}")
-    print(f"{'Standard Cell Count':<30} | {a_gates_str:<24} | {b_gates_str:<24}")
+    print(f"{'Combinational Gates':<30} | {a_comb_str:<24} | {b_comb_str:<24}")
+    print(f"{'Sequential Flip-Flops':<30} | {a_seq_str:<24} | {b_seq_str:<24}")
+    print(f"{'Total Generic Cells':<30} | {a_tot_str:<24} | {b_tot_str:<24}")
     print(f"{'Functional Verification':<30} | {a['verification_status']:<24} | {b['verification_status']:<24}")
     print("==================================================================")
     print(">>> All verification and architectural comparisons completed successfully! <<<")

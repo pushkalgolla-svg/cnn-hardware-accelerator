@@ -4,7 +4,7 @@
 // Features:
 //   - Zero clock-edge race conditions (all inputs driven on negedge clk)
 //   - Measures clock cycles and verifies against analytical cycle formulas:
-//       Measured cycles from start to done = 325 clock cycles (324 compute + 1 done)
+//       Measured cycles from start to done = 326 clock cycles (1 start transition + 324 compute + 1 done)
 //   - Verifies exactly 36 output pixels for fixed-shape 8x8 image convolved with 3x3 kernel
 //   - Multi-phase verification:
 //       Phase 1: Normal full-frame computation with cycle measurement
@@ -138,8 +138,13 @@ module tb_cnn;
         // Wait for frame 1 done pulse
         @(posedge done);
         end_cycle = cycle_counter;   // Rising clock edge where done asserts
-        @(negedge clk);
+        @(negedge clk);               // Sample on race-free negedge
         frame_count = frame_count + 1;
+        @(negedge clk);               // Next clock cycle negedge: single-cycle done must be deasserted
+        if (done !== 1'b0) begin
+            $display("ERROR: done signal is not a single-cycle pulse (stayed high >1 cycle)!");
+            total_errors = total_errors + 1;
+        end
 
         measured_cycles = end_cycle - start_cycle;
         $display("[Phase 1 Cycle Audit]");

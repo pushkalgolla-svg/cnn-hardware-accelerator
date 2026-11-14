@@ -4,9 +4,9 @@
 // Features:
 //   - Zero clock-edge race conditions (all inputs driven on negedge clk)
 //   - Measures clock cycles and verifies against analytical cycle formulas:
-//       Measured buffer preload: 73 cycles (9 kernel + 64 image)
-//       Measured active compute: 37 cycles (36 out_valid + 1 done)
-//       Measured total latency:  110 clock cycles
+//       Measured buffer preload: 73 cycles (9 kernel weights + 64 image pixels)
+//       Measured active compute: 38 cycles (1 start transition + 36 compute output cycles + 1 done)
+//       Measured total latency:  111 clock cycles (73 preload + 38 active compute)
 //   - Verifies exactly 36 output pixels (1 pixel per clock cycle)
 //   - Hardware safety checks:
 //       1. Hardware write-protection: Attempts write to img_buf during COMPUTE,
@@ -203,8 +203,13 @@ module tb_cnn_parallel;
         @(posedge done);
         compute_cycles = cycle_counter - compute_start_cycle;
         total_measured_cycles = preload_cycles + compute_cycles;
-        @(negedge clk);
+        @(negedge clk);               // Sample on race-free negedge
         frame_count = frame_count + 1;
+        @(negedge clk);               // Next clock cycle negedge: single-cycle done must be deasserted
+        if (done !== 1'b0) begin
+            $display("ERROR: done signal is not a single-cycle pulse (stayed high >1 cycle)!");
+            total_errors = total_errors + 1;
+        end
 
         $display("[Phase 1 Cycle Audit]");
         $display("  - Measured Buffer Preload: %0d cycles (Analytical: 9 krn + 64 img = 73)", preload_cycles);
